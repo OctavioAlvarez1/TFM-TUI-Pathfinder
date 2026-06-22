@@ -1,0 +1,21 @@
+destination_id,destination_name,sustainability_score,esg_rating,renewable_energy_pct,green_spaces_pct,waste_recycling_pct
+1,Barcelona,82.5,A,68,18,42
+2,Madrid,74.0,B+,55,14,38
+3,Seville,78.5,A-,72,16,36
+4,Valencia,80.0,A-,65,20,41
+5,Granada,62.0,B,48,22,28
+6,Malaga,68.5,B+,58,15,32
+7,Bilbao,79.0,A-,62,19,44
+8,San Sebastian,81.0,A,70,21,45
+9,Toledo,55.0,B-,42,12,24
+10,Salamanca,58.0,B,45,10,26
+11,Cordoba,66.0,B+,55,14,30
+12,Tenerife,60.0,B,52,25,28
+13,Palma de Mallorca,67.5,B+,60,18,35
+14,Zaragoza,70.0,B+,58,13,36
+15,Santander,65.0,B,55,16,32
+16,Murcia,60.5,B,50,12,28
+17,Alicante,64.0,B+,56,14,30
+18,Cadiz,67.0,B+,60,17,32
+19,Pamplona,71.5,B+,62,15,38
+20,Las Palmas,62.5,B,54,22,30

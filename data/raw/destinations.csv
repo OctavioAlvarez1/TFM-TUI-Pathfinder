@@ -1,0 +1,21 @@
+destination_id,destination_name,destination_type,region
+1,Barcelona,coastal,Cataluña
+2,Madrid,inland,Madrid
+3,Seville,inland,Andalucía
+4,Valencia,coastal,Valencia
+5,Granada,inland,Andalucía
+6,Malaga,coastal,Andalucía
+7,Bilbao,coastal,País Vasco
+8,San Sebastian,coastal,País Vasco
+9,Toledo,inland,Castilla-La Mancha
+10,Salamanca,inland,Castilla y León
+11,Cordoba,inland,Andalucía
+12,Tenerife,island,Canarias
+13,Palma de Mallorca,island,Baleares
+14,Zaragoza,inland,Aragón
+15,Santander,coastal,Cantabria
+16,Murcia,inland,Murcia
+17,Alicante,coastal,Valencia
+18,Cadiz,coastal,Andalucía
+19,Pamplona,inland,Navarra
+20,Las Palmas,island,Canarias

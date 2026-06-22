@@ -26,3 +26,20 @@ def get_full_profile() -> pd.DataFrame:
     dest = load_destinations()[["destination_id", "destination_name", "destination_type", "region"]]
     sust = load_sustainability()[["destination_id", "sustainability_score"]]
     return transport.merge(dest, on=["destination_id", "destination_name"], how="left").merge(sust, on="destination_id", how="left")
+
+
+@st.cache_data
+def load_local_metrics() -> pd.DataFrame:
+    from src.data.local_mobility import get_local_metrics
+    return get_local_metrics()
+
+
+@st.cache_data
+def load_all_pois() -> pd.DataFrame:
+    from src.data.local_mobility import get_all_pois
+    return get_all_pois()
+
+
+def load_pois(destination_name: str) -> pd.DataFrame:
+    from src.data.local_mobility import get_pois
+    return get_pois(destination_name)

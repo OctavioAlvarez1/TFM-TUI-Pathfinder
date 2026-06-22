@@ -4,7 +4,7 @@ from src.config.settings import DESTINATION_COORDS, mobility_color
 
 
 def build_mobility_map(df: pd.DataFrame) -> folium.Map:
-    m = folium.Map(location=[40.4, -3.7], zoom_start=6, tiles="CartoDB positron")
+    m = folium.Map(location=[40.4, -3.7], zoom_start=6, tiles="CartoDB dark_matter")
 
     for _, row in df.iterrows():
         name = row["destination_name"]
@@ -21,25 +21,24 @@ def build_mobility_map(df: pd.DataFrame) -> folium.Map:
             color=color,
             fill=True,
             fill_color=color,
-            fill_opacity=0.75,
-            popup=folium.Popup(
+            fill_opacity=0.80,
+            tooltip=folium.Tooltip(
                 f"<b>{name}</b><br>"
-                f"Mobility score: {score:.0f}/100<br>"
-                f"Train: {row['train_score']}/100<br>"
+                f"Score movilidad: {score:.0f}/100<br>"
+                f"Tren: {row['train_score']}/100<br>"
                 f"Bus: {row['bus_score']}/100<br>"
-                f"Carbon/visitor: {row['carbon_kg_per_visitor']} kg CO₂",
-                max_width=200,
+                f"CO₂/visitante: {row['carbon_kg_per_visitor']} kg"
             ),
-            tooltip=f"{name} — {score:.0f}",
         ).add_to(m)
 
     legend = """
-    <div style="position:fixed;bottom:30px;left:30px;z-index:1000;background:white;
-                padding:10px 16px;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,.3);font-size:13px">
-        <b>Mobility Score</b><br>
-        <span style="color:#10B981">●</span> ≥ 75 — High (sustainable)<br>
-        <span style="color:#F59E0B">●</span> 50–74 — Moderate<br>
-        <span style="color:#EF4444">●</span> &lt; 50 — Low (car/flight dependent)
+    <div style="position:fixed;bottom:25px;left:25px;z-index:1000;
+                background:rgba(17,24,39,0.95);padding:10px 14px;
+                border-radius:8px;border:1px solid #374151;font-size:12px;color:#F1F5F9;">
+        <b>Score de Movilidad Sostenible</b><br>
+        <span style="color:#10B981">●</span> ≥ 75 — Alta (sostenible)<br>
+        <span style="color:#F59E0B">●</span> 50–74 — Moderada<br>
+        <span style="color:#EF4444">●</span> &lt; 50 — Baja (dep. coche/vuelo)
     </div>"""
     m.get_root().html.add_child(folium.Element(legend))
     return m

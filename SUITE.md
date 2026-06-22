@@ -50,12 +50,76 @@ All 5 projects share the same 20 Spanish destinations and dataset. Horizon is th
 
 Primary source: `TUI-Smart-Destination-Recommender/data/`
 
-- `destinations.csv` — 20 Spanish destinations
-- `sustainability_scores.csv` — ESG scores per destination
-- `congestion_scores.csv` — monthly congestion (12 months × 20 destinations)
-- `bookings_history.csv` — ~1,000 bookings
-- `ine_eoh_monthly.csv` — INE hotel occupancy (open data)
-- `frontur_ccaa.csv` — FRONTUR international arrivals (open data)
+### Synthetic files (stable, no refresh needed)
+| File | Content |
+|---|---|
+| `data/raw/destinations.csv` | 20 Spanish destinations with attribute scores |
+| `data/raw/bookings_history.csv` | ~1,000 synthetic bookings |
+| `data/raw/users.csv` | 100 GDPR-compliant traveler profiles |
+
+### Real open data files (refresh with `fetch_open_data.py`)
+| File | Source | Status |
+|---|---|---|
+| `data/raw/congestion_scores.csv` | INE EOH Table 49371 | ✅ Real — 13/13 provinces, 240 rows |
+| `data/raw/sustainability_scores.csv` | FRONTUR Table 23988 | ✅ Real — enriched with international fractions |
+| `data/enriched/ine_eoh_monthly.csv` | INE EOH — raw monthly travelers | ✅ Real — 156 rows |
+| `data/enriched/frontur_ccaa.csv` | FRONTUR — raw CCAA arrivals | ✅ Real — 8 CCAA |
+| `data/enriched/aemet_climate.csv` | AEMET climate normals | ⚠️ Optional — requires `AEMET_API_KEY` |
+
+### Refresh open data
+```bash
+# INE + FRONTUR (no auth required)
+python data/scripts/fetch_open_data.py
+
+# Full refresh including AEMET climate normals
+$env:AEMET_API_KEY = "your_key"   # PowerShell
+python data/scripts/fetch_open_data.py
+```
+AEMET free keys have per-hour rate limits. If you see 429 errors, wait ~1 hour and retry.
+
+---
+
+## Shared Design Language
+
+All projects use the same congestion/status color scale and semantic palette. Keep these consistent across Streamlit (Plotly) and React projects.
+
+### Congestion Color Scale
+
+| Score | Level | Hex | Meaning |
+|---|---|---|---|
+| 0–30 | Low | `#16A34A` | Under-visited — Horizon actively promotes |
+| 31–60 | Moderate | `#CA8A04` | Acceptable |
+| 61–80 | High | `#EA580C` | Expect crowds |
+| 81–100 | Very High | `#DC2626` | Redistribution penalty active (−10%) |
+
+### Destination Status Categories
+
+| Status | Condition | Color |
+|---|---|---|
+| Opportunity | congestion < 55 AND peak ≥ 80 | `#10B981` green |
+| Moderate | default | `#F59E0B` amber |
+| High Pressure | congestion ≥ 80 | `#EA580C` orange |
+| Overloaded | congestion ≥ 92 | `#DC2626` red |
+
+### Semantic Palette (shared across all 5 projects)
+
+```
+Primary green  #10B981   — sustainability, positive, low congestion
+Amber          #F59E0B   — moderate, neutral, caution
+Orange         #EA580C   — high pressure
+Red            #EF4444   — critical, overloaded, negative sentiment
+Blue           #2563EB   — informational, section headers
+Indigo         #6366F1   — preference / AI features
+```
+
+### Destination Type Colors
+
+| Type | Color |
+|---|---|
+| Beach | `#38BDF8` sky blue |
+| City | `#818CF8` indigo |
+| Nature | `#34D399` emerald |
+| Mixed | `#FBBF24` amber |
 
 ## Desktop Layout
 
@@ -91,6 +155,16 @@ cd TUI-Pathfinder && streamlit run app.py --server.port 8503
 # Terminal 6 — Sage (RAG AI advisor, requires ANTHROPIC_API_KEY)
 cd TUI-Sage && streamlit run app.py --server.port 8504
 ```
+
+## Design System
+
+Visual patterns, component recipes, and Streamlit equivalents are documented in:
+
+**`TUI-Smart-Destination-Recommender/DESIGN_SYSTEM.md`**
+
+Covers: MUI v9 dark mode rules, glassmorphism cards, SVG area charts, interactive bar charts, heat tile grid, Framer Motion re-animation, Leaflet tile layers, congestion color helpers, and Streamlit/Plotly equivalents for Atlas/Sentinel/Pathfinder.
+
+---
 
 ## Required Environment Variables
 

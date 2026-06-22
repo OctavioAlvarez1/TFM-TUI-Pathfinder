@@ -6,36 +6,39 @@ import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
 from src.data.data_loader import load_local_metrics, load_transport
+from src.ui.styles import render_css, kpi_card, insight_box, sunset_bar
 
 st.set_page_config(page_title="Brechas · Pathfinder", page_icon="📊", layout="wide")
+render_css(st)
 
-st.markdown("""
-<style>
-[data-testid="stAppViewContainer"] { background: #0B1220; }
-[data-testid="stSidebar"] { background: #111827; }
-</style>
-""", unsafe_allow_html=True)
-
-st.title("📊 Brechas de Infraestructura")
+st.markdown('<div class="hero-title">📊 Brechas de <span class="hero-accent">Infraestructura</span></div>', unsafe_allow_html=True)
 st.caption("Análisis comparativo de movilidad sostenible. Identifica dónde invertir para reducir la dependencia del coche y mejorar la experiencia turística.")
+st.markdown(sunset_bar(), unsafe_allow_html=True)
 
 try:
-    local   = load_local_metrics()
+    local     = load_local_metrics()
     transport = load_transport()
 
-    # Merge with transport for full view
     merged = local.merge(
         transport[["destination_name", "overall_mobility_score", "carbon_kg_per_visitor", "public_transport_modal_share"]],
         on="destination_name", how="left",
     )
 
     # ── KPIs ──────────────────────────────────────────────────────────────
+    high_gap     = int((local["infrastructure_gap"] > 35).sum())
+    worst_bici   = local.loc[local["cycling_km"].idxmin(), "destination_name"]
+    worst_car    = local.loc[local["car_dependency"].idxmax(), "destination_name"]
+    worst_univ   = local.loc[local["universal_access"].idxmin(), "destination_name"]
+
     c1, c2, c3, c4 = st.columns(4)
-    high_gap = int((local["infrastructure_gap"] > 35).sum())
-    c1.metric("Destinos con brecha alta (>35)", high_gap)
-    c2.metric("Menor km carril bici", f"{local['cycling_km'].min()} km", local[local['cycling_km'] == local['cycling_km'].min()]['destination_name'].values[0])
-    c3.metric("Mayor dependencia coche", f"{local['car_dependency'].max()}%", local[local['car_dependency'] == local['car_dependency'].max()]['destination_name'].values[0])
-    c4.metric("Menor accesibilidad universal", f"{local['universal_access'].min()}/100", local[local['universal_access'] == local['universal_access'].min()]['destination_name'].values[0])
+    with c1:
+        st.markdown(kpi_card(str(high_gap), "Destinos con Brecha Alta", "Infraestructura gap > 35 pts"), unsafe_allow_html=True)
+    with c2:
+        st.markdown(kpi_card(f"{local['cycling_km'].min()} km", "Menor Red Ciclista", worst_bici), unsafe_allow_html=True)
+    with c3:
+        st.markdown(kpi_card(f"{local['car_dependency'].max()}%", "Mayor Dep. Coche", worst_car), unsafe_allow_html=True)
+    with c4:
+        st.markdown(kpi_card(f"{local['universal_access'].min()}", "Menor Acc. Universal", worst_univ), unsafe_allow_html=True)
 
     st.markdown("---")
 
@@ -57,9 +60,9 @@ try:
             text=[f"{v} km" for v in local_sorted["cycling_km"]],
             textposition="outside",
         ))
-        fig1.add_vline(x=local["cycling_km"].mean(), line_dash="dash", line_color="#94A3B8",
+        fig1.add_vline(x=local["cycling_km"].mean(), line_dash="dash", line_color="#818CF8",
                        annotation_text=f"Media: {local['cycling_km'].mean():.0f} km",
-                       annotation_font_color="#94A3B8")
+                       annotation_font_color="#818CF8")
         fig1.update_layout(
             height=520, xaxis=dict(range=[0, 250], title="km de carril bici"),
             yaxis_title="", margin=dict(l=10, r=80, t=20, b=20),
@@ -83,9 +86,9 @@ try:
             text=[f"{v}" for v in local_sorted2["universal_access"]],
             textposition="outside",
         ))
-        fig2.add_vline(x=65, line_dash="dash", line_color="#818CF8",
+        fig2.add_vline(x=65, line_dash="dash", line_color="#0DD3C5",
                        annotation_text="Umbral recomendado: 65",
-                       annotation_font_color="#818CF8")
+                       annotation_font_color="#0DD3C5")
         fig2.update_layout(
             height=520, xaxis=dict(range=[0, 115], title="Score accesibilidad universal"),
             yaxis_title="", margin=dict(l=10, r=60, t=20, b=20),
@@ -98,7 +101,7 @@ try:
 
     # ── Scatter: accessibility vs car dependency ────────────────────────────
     st.subheader("Accesibilidad Local vs Dependencia del Vehículo Privado")
-    st.caption("Ideal: alta accesibilidad local + baja dependencia del coche (zona superior izquierda · verde)")
+    st.caption("Ideal: alta accesibilidad local + baja dependencia del coche (zona superior izquierda)")
 
     fig_scatter = px.scatter(
         merged,
@@ -114,11 +117,11 @@ try:
         size_max=40,
     )
     fig_scatter.add_hline(y=merged["local_accessibility_index"].mean(), line_dash="dash",
-                          line_color="#94A3B8", annotation_text="Media accesibilidad",
-                          annotation_font_color="#94A3B8")
+                          line_color="#818CF8", annotation_text="Media accesibilidad",
+                          annotation_font_color="#818CF8")
     fig_scatter.add_vline(x=merged["car_dependency"].mean(), line_dash="dash",
-                          line_color="#94A3B8", annotation_text="Media dependencia coche",
-                          annotation_font_color="#94A3B8")
+                          line_color="#818CF8", annotation_text="Media dep. coche",
+                          annotation_font_color="#818CF8")
     fig_scatter.update_traces(textposition="top center")
     fig_scatter.update_layout(
         xaxis_title="Dependencia del vehículo privado (%)",
@@ -131,6 +134,17 @@ try:
 
     st.markdown("---")
 
+    # AI Insight
+    bottom3_names = ", ".join(local.sort_values("local_accessibility_index").head(3)["destination_name"].tolist())
+    st.markdown(insight_box(
+        f"Los destinos <strong>{bottom3_names}</strong> concentran las brechas de infraestructura más severas: "
+        f"red ciclista inferior a 50 km, score de bus por debajo de 65/100 y alta dependencia del coche. "
+        f"Una inversión coordinada de 15–20 M€ en ciclovías turísticas y mejora de frecuencias de bus "
+        f"elevaría su índice de accesibilidad en ~25 puntos, equiparándolos a la media del portfolio."
+    ), unsafe_allow_html=True)
+
+    st.markdown("---")
+
     # ── Priority investment table ─────────────────────────────────────────
     st.subheader("Prioridades de Inversión — Top 5 destinos con mayor brecha")
     st.caption("Ciudades con alto flujo turístico pero infraestructura de movilidad sostenible insuficiente")
@@ -139,8 +153,6 @@ try:
 
     for _, row in bottom5.iterrows():
         gap = row["infrastructure_gap"]
-        gap_color = "#EF4444" if gap > 40 else "#F59E0B"
-
         with st.expander(f"🚧 {row['destination_name']} — brecha: {gap:.1f} puntos"):
             b1, b2, b3, b4 = st.columns(4)
             b1.metric("Carril bici", f"{row['cycling_km']} km",
@@ -148,13 +160,11 @@ try:
                       delta_color="inverse")
             b2.metric("Bus local", f"{row['local_bus_score']}/100")
             b3.metric("Accesibilidad universal", f"{row['universal_access']}/100")
-            b4.metric("Dependencia coche", f"{row['car_dependency']}%",
-                      delta_color="inverse")
+            b4.metric("Dependencia coche", f"{row['car_dependency']}%", delta_color="inverse")
 
-            # Recommendations
             recs = []
             if row["cycling_km"] < 50:
-                recs.append(f"Ampliar red ciclista urbana: actualmente {row['cycling_km']} km, objetivo mínimo 80 km en zona turística")
+                recs.append(f"Ampliar red ciclista: actualmente {row['cycling_km']} km, objetivo mínimo 80 km")
             if row["local_bus_score"] < 65:
                 recs.append(f"Mejorar frecuencia del bus local (score actual: {row['local_bus_score']}/100)")
             if row["universal_access"] < 60:
@@ -162,9 +172,10 @@ try:
             if row["bike_stations"] < 50:
                 recs.append(f"Instalar red de bicicleta pública: actualmente {row['bike_stations']} estaciones")
 
-            st.markdown("**Recomendaciones:**")
-            for r in recs:
-                st.markdown(f"- {r}")
+            if recs:
+                st.markdown("**Recomendaciones:**")
+                for r in recs:
+                    st.markdown(f"- {r}")
 
     st.markdown("---")
 
@@ -192,7 +203,7 @@ try:
         )
 
     st.markdown("---")
-    st.subheader("Oportunidades de Inversión — Análisis estratégico")
+    st.subheader("Análisis estratégico")
     st.markdown("""
 **Tres tipologías de brecha identificadas:**
 

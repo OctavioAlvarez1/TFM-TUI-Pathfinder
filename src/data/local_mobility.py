@@ -1,10 +1,51 @@
 """
 Local (within-city) mobility data for 20 Spanish destinations.
 Covers cycling infrastructure, walking quality, local bus coverage, POIs, and sustainable route options.
-Inspired by OpenStreetMap data, Spanish municipal cycling plans, and GTFS feeds.
+Baseline values are synthetic (inspired by OSM / municipal plans).
+When data/open/osm_mobility.json exists (produced by data/open/fetch_osm_data.py),
+real OSM counts are blended in: cycling_km is adjusted proportionally based on
+OSM cycling_ways_count, bike_stations on bike_rental_nodes, local_bus_score on
+bus_stop_count.  Same integration pattern as Sentinel's INE/OD-TripM pipeline.
 """
+import json
+import math
+from pathlib import Path
 import pandas as pd
 import numpy as np
+
+_OSM_JSON = Path(__file__).resolve().parents[2] / "data" / "open" / "osm_mobility.json"
+
+
+def _load_osm_overrides() -> dict:
+    """Return per-city OSM correction factors, or empty dict if file missing."""
+    if not _OSM_JSON.exists():
+        return {}
+    try:
+        raw = json.loads(_OSM_JSON.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+    # Normalise counts to [0.5 … 1.5] correction multipliers
+    # so synthetic baselines are nudged rather than replaced.
+    cycling_vals = [v["cycling_ways_count"] for v in raw.values() if v["cycling_ways_count"] >= 0]
+    bike_vals    = [v["bike_rental_nodes"]   for v in raw.values() if v["bike_rental_nodes"]   >= 0]
+    bus_vals     = [v["bus_stop_count"]      for v in raw.values() if v["bus_stop_count"]      >= 0]
+
+    def safe_max(lst):
+        return max(lst) if lst else 1
+
+    max_c = safe_max(cycling_vals)
+    max_b = safe_max(bike_vals)
+    max_s = safe_max(bus_vals)
+
+    overrides = {}
+    for city, v in raw.items():
+        overrides[city] = {
+            "cycling_factor": 0.5 + (v["cycling_ways_count"] / max_c) if v["cycling_ways_count"] >= 0 else 1.0,
+            "bike_factor":    0.5 + (v["bike_rental_nodes"]   / max_b) if v["bike_rental_nodes"]   >= 0 else 1.0,
+            "bus_factor":     0.5 + (v["bus_stop_count"]      / max_s) if v["bus_stop_count"]      >= 0 else 1.0,
+        }
+    return overrides
 
 # columns: id, name, lat, lon, cycling_km, walking_score, bike_stations, local_bus, universal_access, avg_walk_min, sentiment_mobility
 _LOCAL_DATA = [
@@ -76,6 +117,19 @@ def get_local_metrics() -> pd.DataFrame:
         return _local_cache
 
     df = pd.DataFrame(_LOCAL_DATA, columns=_COLS)
+
+    # Blend real OSM counts when available
+    osm = _load_osm_overrides()
+    if osm:
+        def _apply(row):
+            o = osm.get(row["destination_name"], {})
+            if o:
+                row = row.copy()
+                row["cycling_km"]      = round(row["cycling_km"]      * min(o["cycling_factor"], 1.5), 0)
+                row["bike_stations"]   = round(row["bike_stations"]    * min(o["bike_factor"],    1.5), 0)
+                row["local_bus_score"] = round(min(row["local_bus_score"] * min(o["bus_factor"], 1.3), 100), 0)
+            return row
+        df = df.apply(_apply, axis=1)
 
     cycling_norm = df["cycling_km"] / df["cycling_km"].max() * 100
     df["local_accessibility_index"] = (

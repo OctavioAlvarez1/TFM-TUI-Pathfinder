@@ -1,6 +1,7 @@
 import streamlit as st
 from src.data.data_loader import load_transport, load_local_metrics
 from src.components.map_builder import build_mobility_map
+from src.ui.styles import render_css, kpi_card, insight_box, sunset_bar, tags
 from streamlit_folium import st_folium
 
 st.set_page_config(
@@ -9,33 +10,12 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
-
-st.markdown("""
-<style>
-[data-testid="stAppViewContainer"] { background: #0B1220; }
-[data-testid="stSidebar"] { background: #111827; }
-.metric-card {
-    background: linear-gradient(135deg, rgba(13,211,197,0.08) 0%, rgba(3,44,58,0.95) 100%);
-    border: 1px solid rgba(13,211,197,0.3);
-    border-radius: 12px;
-    padding: 20px 16px;
-    text-align: center;
-    margin-bottom: 8px;
-}
-.metric-value { font-size: 2rem; font-weight: 700; color: #0DD3C5; line-height: 1.1; }
-.metric-label { font-size: 0.78rem; color: #94A3B8; margin-top: 6px; }
-.hero-title   { font-size: 2.4rem; font-weight: 800; color: #F1F5F9; line-height: 1.15; }
-.hero-sub     { font-size: 1rem; color: #64748B; margin-top: 6px; }
-.tag { display:inline-block; background:rgba(13,211,197,0.12); color:#0DD3C5;
-       border:1px solid rgba(13,211,197,0.3); border-radius:20px;
-       padding:3px 12px; font-size:0.75rem; margin:3px 2px; }
-</style>
-""", unsafe_allow_html=True)
+render_css(st)
 
 # ── Sidebar ────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("## 🧭 TUI Pathfinder")
-    st.markdown("<p style='color:#64748B;font-size:0.82rem;'>Reto 4 · Target 8.9 · Future Shapers Spain</p>", unsafe_allow_html=True)
+    st.markdown("<p style='color:#475569;font-size:0.82rem;'>Reto 4 · Target 8.9 · Future Shapers Spain</p>", unsafe_allow_html=True)
     st.divider()
     st.markdown("""
 **Páginas disponibles:**
@@ -47,26 +27,18 @@ with st.sidebar:
 - 📊 Brechas e Infraestructura
     """)
     st.divider()
-    st.markdown("<p style='color:#64748B;font-size:0.75rem;'>Fuentes: OpenStreetMap · GTFS · Datos Abiertos Municipales · INE</p>", unsafe_allow_html=True)
+    st.markdown("<p style='color:#475569;font-size:0.75rem;'>Fuentes: OpenStreetMap · GTFS · Datos Abiertos Municipales · INE</p>", unsafe_allow_html=True)
 
-# ── Header ────────────────────────────────────────────────────────────────
+# ── Hero header ────────────────────────────────────────────────────────────
 st.markdown("""
-<div>
-  <span class="hero-title">TUI Pathfinder</span><br>
+<div style="padding: 8px 0 4px;">
+  <span class="hero-title">TUI <span class="hero-accent">Pathfinder</span></span><br>
   <span class="hero-sub">Generador de Mapas de Accesibilidad &amp; Movilidad Sostenible con IA · Target 8.9</span>
 </div>
 """, unsafe_allow_html=True)
 
-st.markdown("""
-<div style='margin:12px 0 20px;'>
-<span class="tag">OpenStreetMap</span>
-<span class="tag">GTFS / Transporte Público</span>
-<span class="tag">Ciclovías</span>
-<span class="tag">Accesibilidad Universal</span>
-<span class="tag">CO₂ Evitado</span>
-<span class="tag">Smart Destinations</span>
-</div>
-""", unsafe_allow_html=True)
+st.markdown(tags("OpenStreetMap", "GTFS / Transporte Público", "Ciclovías", "Accesibilidad Universal", "CO₂ Evitado", "Smart Destinations"), unsafe_allow_html=True)
+st.markdown(sunset_bar(), unsafe_allow_html=True)
 
 # ── Data ──────────────────────────────────────────────────────────────────
 try:
@@ -75,29 +47,18 @@ try:
 
     # ── KPI Cards ─────────────────────────────────────────────────────────
     c1, c2, c3, c4 = st.columns(4)
+    avg_acc = round(local["local_accessibility_index"].mean(), 1)
+    total_bici = int(local["cycling_km"].sum())
+    high_mob = int((transport["overall_mobility_score"] >= 75).sum())
+
     with c1:
-        st.markdown(f"""<div class="metric-card">
-            <div class="metric-value">20</div>
-            <div class="metric-label">Destinos Analizados</div>
-        </div>""", unsafe_allow_html=True)
+        st.markdown(kpi_card("20", "Destinos Analizados", "España peninsular + islas"), unsafe_allow_html=True)
     with c2:
-        avg_acc = round(local["local_accessibility_index"].mean(), 1)
-        st.markdown(f"""<div class="metric-card">
-            <div class="metric-value">{avg_acc}</div>
-            <div class="metric-label">Índice Accesibilidad Local Medio</div>
-        </div>""", unsafe_allow_html=True)
+        st.markdown(kpi_card(str(avg_acc), "Índice Accesibilidad Local Medio", "Escala 0–100"), unsafe_allow_html=True)
     with c3:
-        total_bici = int(local["cycling_km"].sum())
-        st.markdown(f"""<div class="metric-card">
-            <div class="metric-value">{total_bici:,}</div>
-            <div class="metric-label">km de Carriles Bici (total)</div>
-        </div>""", unsafe_allow_html=True)
+        st.markdown(kpi_card(f"{total_bici:,}", "km de Carriles Bici (total)", "Suma de los 20 destinos"), unsafe_allow_html=True)
     with c4:
-        high_mob = int((transport["overall_mobility_score"] >= 75).sum())
-        st.markdown(f"""<div class="metric-card">
-            <div class="metric-value">{high_mob}</div>
-            <div class="metric-label">Destinos con Alta Movilidad Sostenible</div>
-        </div>""", unsafe_allow_html=True)
+        st.markdown(kpi_card(str(high_mob), "Destinos Alta Movilidad Sostenible", "Score interurbano ≥ 75"), unsafe_allow_html=True)
 
     st.markdown("---")
 
@@ -105,8 +66,8 @@ try:
     col_map, col_table = st.columns([3, 2])
 
     with col_map:
-        st.subheader("🗺️ Mapa de Conectividad — España")
-        st.caption("Tamaño y color del círculo = puntuación de movilidad sostenible interurbana. Haz clic para detalles.")
+        st.markdown('<div class="map-label">Mapa Nacional de Movilidad</div>', unsafe_allow_html=True)
+        st.caption("Tamaño y color del círculo = puntuación de movilidad sostenible interurbana")
         m = build_mobility_map(transport)
         st_folium(m, use_container_width=True, height=440, returned_objects=[])
 
@@ -142,27 +103,35 @@ try:
 
     st.markdown("---")
 
+    # ── AI Insight ────────────────────────────────────────────────────────
+    best_dest = transport.sort_values("overall_mobility_score", ascending=False).iloc[0]["destination_name"]
+    worst_dest = transport.sort_values("overall_mobility_score").iloc[0]["destination_name"]
+    avg_co2 = round(transport["carbon_kg_per_visitor"].mean(), 0)
+    st.markdown(insight_box(
+        f"El destino mejor conectado en transporte sostenible es <strong>{best_dest}</strong>. "
+        f"El CO₂ medio por visitante en la llegada es <strong>{avg_co2:.0f} kg</strong> — "
+        f"hasta 4× inferior al avión si se usa el tren AVE. "
+        f"<strong>{worst_dest}</strong> y otros destinos insulares presentan brecha estructural "
+        f"por dependencia del vuelo y requieren compensación vía movilidad intra-destino sostenible."
+    ), unsafe_allow_html=True)
+
+    st.markdown("---")
+
     # ── Problem context ───────────────────────────────────────────────────
     st.subheader("¿Qué problema resuelve Pathfinder?")
     p1, p2, p3 = st.columns(3)
     with p1:
-        st.markdown("""
-**Falta de visibilidad**
+        st.markdown("""**Falta de visibilidad**
 
-Los destinos no saben cómo se conectan sus recursos turísticos mediante movilidad sostenible. ¿A qué distancia está el hotel del monumento más cercano en bici? ¿Hay carril habilitado?
-        """)
+Los destinos no saben cómo se conectan sus recursos turísticos mediante movilidad sostenible. ¿A qué distancia está el hotel del monumento más cercano en bici? ¿Hay carril habilitado?""")
     with p2:
-        st.markdown("""
-**Alta dependencia del coche**
+        st.markdown("""**Alta dependencia del coche**
 
-El 70% de los destinos analizados presentan dependencia del vehículo privado superior al 45%, generando congestión, emisiones y degradación de la experiencia turística.
-        """)
+El 70% de los destinos analizados presentan dependencia del vehículo privado superior al 45%, generando congestión, emisiones y degradación de la experiencia turística.""")
     with p3:
-        st.markdown("""
-**Brechas de infraestructura**
+        st.markdown("""**Brechas de infraestructura**
 
-Ciudades con alto potencial turístico carecen de ciclovías, transporte local frecuente o rutas peatonales accesibles para conectar sus principales atractivos.
-        """)
+Ciudades con alto potencial turístico carecen de ciclovías, transporte local frecuente o rutas peatonales accesibles para conectar sus principales atractivos.""")
 
 except Exception as e:
     st.error(f"Error cargando datos: {e}")

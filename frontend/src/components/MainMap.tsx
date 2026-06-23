@@ -3,7 +3,21 @@ import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaf
 import { Box, Typography, Chip, IconButton, Divider, LinearProgress } from '@mui/material'
 import LayersIcon from '@mui/icons-material/Layers'
 import CloseIcon from '@mui/icons-material/Close'
-import { pois, VALENCIA_CENTER, type POI } from '../data/mockData'
+// pois and VALENCIA_CENTER were removed from mockData — use local constants
+interface POI {
+  id: number
+  name: string
+  type: 'hotel' | 'monument' | 'transport' | 'restaurant' | 'beach' | 'bike'
+  lat: number
+  lon: number
+  accesibilidad: number
+  transporte: number
+  movilidad: number
+  distanciaMetro: string
+  tiempoCentro: string
+}
+const VALENCIA_CENTER: [number, number] = [39.470, -0.376]
+const pois: POI[] = []
 import 'leaflet/dist/leaflet.css'
 
 const LAYER_CONFIG = [

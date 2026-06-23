@@ -2,7 +2,10 @@ import { useState } from 'react'
 import { Box, Typography } from '@mui/material'
 import { MapContainer, TileLayer, CircleMarker } from 'react-leaflet'
 import { motion } from 'framer-motion'
-import { touristProfiles, pois, VALENCIA_CENTER } from '../data/mockData'
+import { touristProfiles } from '../data/mockData'
+// pois and VALENCIA_CENTER were removed from mockData — use local constants
+const VALENCIA_CENTER: [number, number] = [39.470, -0.376]
+const pois: { id: number; lat: number; lon: number; accesibilidad: number }[] = []
 import 'leaflet/dist/leaflet.css'
 
 const PROFILE_COLORS: Record<string, string> = {

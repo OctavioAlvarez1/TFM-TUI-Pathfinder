@@ -1,79 +1,70 @@
 import { ThemeProvider, CssBaseline, Box } from '@mui/material'
-import { darkTheme } from './theme/darkTheme'
+import { createTheme } from '@mui/material/styles'
+import { lightTheme } from './theme/lightTheme'
+import { DestinationProvider } from './context/DestinationContext'
 import Sidebar from './components/Sidebar'
 import TopBar from './components/TopBar'
 import KPIBar from './components/KPIBar'
-import MainMap from './components/MainMap'
+import HeatmapPanel from './components/HeatmapPanel'
 import EvolutionChart from './components/EvolutionChart'
 import ModalDonut from './components/ModalDonut'
-import OpportunitiesTable from './components/OpportunitiesTable'
-import HeatmapPanel from './components/HeatmapPanel'
-import AIAssistant from './components/AIAssistant'
-import RecommendationCards from './components/RecommendationCards'
-import TouristMode from './components/TouristMode'
-import ExecutiveView from './components/ExecutiveView'
+import OpportunitiesPanel from './components/OpportunitiesPanel'
 import './index.css'
+
+const sidebarTheme = createTheme({
+  palette: {
+    mode: 'dark',
+    text: { primary: '#F1F5F9', secondary: '#94A3B8' },
+    background: { default: '#0F172A', paper: '#0F172A' },
+  },
+  typography: { fontFamily: '"Inter","Roboto",sans-serif' },
+})
 
 export default function App() {
   return (
-    <ThemeProvider theme={darkTheme}>
+    <ThemeProvider theme={lightTheme}>
       <CssBaseline />
-      <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#0B1220' }}>
+      <DestinationProvider>
+      <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+
         {/* Sidebar */}
-        <Sidebar />
+        <ThemeProvider theme={sidebarTheme}>
+          <Sidebar />
+        </ThemeProvider>
 
-        {/* Main content */}
-        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
-          {/* Top bar */}
-          <TopBar />
+        {/* Main area */}
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0, position: 'relative' }}>
 
-          {/* KPI strip */}
-          <KPIBar />
+            {/* Content */}
+          <Box sx={{ position: 'relative', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', background: '#F1F5F9' }}>
+            <TopBar />
+            <KPIBar />
 
-          {/* Scrollable body */}
-          <Box sx={{ flex: 1, overflowY: 'auto', px: 2.5, pb: 2.5, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Box sx={{ flex: 1, overflowY: 'auto', p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
 
-            {/* Row 1: Map + Right column */}
-            <Box sx={{ display: 'flex', gap: 1.5, height: 420 }}>
-              {/* Main map — takes most of the space */}
-              <Box sx={{ flex: '0 0 58%', display: 'flex', flexDirection: 'column' }}>
-                <MainMap />
+              {/* Row 1: Map full width */}
+              <Box sx={{ height: 320, flexShrink: 0 }}>
+                <HeatmapPanel />
               </Box>
 
-              {/* Right column: heatmap + AI */}
-              <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1.5, minWidth: 0 }}>
-                <Box sx={{ flex: '0 0 55%' }}>
-                  <HeatmapPanel />
+              {/* Row 2: Charts + Opportunities — same height */}
+              <Box sx={{ display: 'flex', gap: 2, height: 320, alignItems: 'stretch' }}>
+                <Box sx={{ flex: '0 0 45%', height: '100%' }}>
+                  <EvolutionChart />
                 </Box>
-                <Box sx={{ flex: 1 }}>
-                  <AIAssistant />
+                <Box sx={{ flex: '0 0 200px', height: '100%' }}>
+                  <ModalDonut />
+                </Box>
+                <Box sx={{ flex: 1, height: '100%' }}>
+                  <OpportunitiesPanel />
                 </Box>
               </Box>
+
             </Box>
-
-            {/* Row 2: Evolution + Donut + Opportunities */}
-            <Box sx={{ display: 'flex', gap: 1.5, height: 230 }}>
-              <EvolutionChart />
-              <ModalDonut />
-              <OpportunitiesTable />
-            </Box>
-
-            {/* Row 3: IA Recommendations */}
-            <RecommendationCards />
-
-            {/* Row 4: Tourist mode + Executive view */}
-            <Box sx={{ display: 'flex', gap: 1.5, height: 340 }}>
-              <Box sx={{ flex: '0 0 38%' }}>
-                <TouristMode />
-              </Box>
-              <Box sx={{ flex: 1 }}>
-                <ExecutiveView />
-              </Box>
-            </Box>
-
           </Box>
         </Box>
       </Box>
+      </DestinationProvider>
     </ThemeProvider>
   )
 }

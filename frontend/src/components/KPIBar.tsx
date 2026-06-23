@@ -6,7 +6,8 @@ import DirectionsBusIcon from '@mui/icons-material/DirectionsBus'
 import EnergySavingsLeafIcon from '@mui/icons-material/EnergySavingsLeaf'
 import AccessTimeIcon from '@mui/icons-material/AccessTime'
 import LocationOnIcon from '@mui/icons-material/LocationOn'
-import { kpis } from '../data/mockData'
+import { getDestinationKPIs } from '../data/mockData'
+import { useDestination } from '../context/DestinationContext'
 
 const ICONS = [
   <AccessibleIcon        sx={{ fontSize: 20 }} />,
@@ -18,6 +19,9 @@ const ICONS = [
 ]
 
 export default function KPIBar() {
+  const { destination } = useDestination()
+  const kpis = getDestinationKPIs(destination.id)
+
   return (
     <Box sx={{
       display: 'flex',
@@ -37,24 +41,24 @@ export default function KPIBar() {
           style={{ flex: 1, minWidth: 0 }}
         >
           <Box sx={{
-            background: '#FFFFFF',
-            borderRadius: '14px',
-            border: '1px solid #E2E8F0',
+            background: `linear-gradient(160deg, ${k.color}09 0%, #FFFFFF 50%)`,
+            borderRadius: '12px',
+            border: '1px solid #E0D8CF',
             borderTop: `3px solid ${k.color}`,
-            boxShadow: '0 2px 10px rgba(0,0,0,0.07)',
+            boxShadow: '0 1px 6px rgba(0,0,0,0.07)',
             px: 2, py: 1.8,
             height: '100%',
             transition: 'box-shadow 0.2s, transform 0.15s',
             '&:hover': {
-              boxShadow: `0 6px 20px ${k.color}28`,
-              transform: 'translateY(-1px)',
+              boxShadow: `0 6px 20px ${k.color}22`,
+              transform: 'translateY(-2px)',
             },
           }}>
             {/* Icon + label */}
             <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 1.2 }}>
               <Box sx={{
-                width: 34, height: 34, borderRadius: '10px',
-                background: `${k.color}18`,
+                width: 32, height: 32, borderRadius: '8px',
+                background: `${k.color}12`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 color: k.color, flexShrink: 0, mt: '1px',
               }}>

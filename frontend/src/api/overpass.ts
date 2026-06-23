@@ -23,7 +23,7 @@ export interface CyclePath {
   color: string
 }
 
-// ── In-memory caches ──────────────────────────────────────────────────────────
+// ── In-memory caches — only populated on success with results ─────────────────
 const _poiCache  = new Map<string, OverpassPOI[]>()
 const _pathCache = new Map<string, CyclePath[]>()
 
@@ -46,13 +46,14 @@ export function classifyTags(tags: Record<string, string>): POIType | null {
 
   if (natural === 'beach' || leisure === 'beach_resort' || tourism === 'beach_resort') return 'beach'
 
-  if (highway === 'bus_stop' || ['station', 'subway_station', 'tram_stop'].includes(railway) || amenity === 'bus_station' || amenity === 'ferry_terminal') return 'transport'
+  if (
+    highway === 'bus_stop' ||
+    ['station', 'subway_station', 'tram_stop'].includes(railway) ||
+    amenity === 'bus_station' || amenity === 'ferry_terminal'
+  ) return 'transport'
 
   if (amenity === 'bicycle_rental') return 'bike'
-  if (amenity === 'bicycle_parking') {
-    const capacity = parseInt(tags['capacity'] ?? '0', 10)
-    if (capacity > 5) return 'bike'
-  }
+  if (amenity === 'bicycle_parking' && parseInt(tags['capacity'] ?? '0', 10) > 5) return 'bike'
 
   return null
 }
@@ -62,29 +63,35 @@ export function extractWikiPage(tags: Record<string, string>): string | undefine
   const wp = tags['wikipedia']
   if (wp) {
     const colonIdx = wp.indexOf(':')
-    if (colonIdx !== -1) return wp.slice(colonIdx + 1).replace(/ /g, '_')
-    return wp.replace(/ /g, '_')
+    return (colonIdx !== -1 ? wp.slice(colonIdx + 1) : wp).replace(/ /g, '_')
   }
   if (tags['name:en']) return tags['name:en'].replace(/ /g, '_')
   if (tags['name'])    return tags['name'].replace(/ /g, '_')
   return undefined
 }
 
-// ── Overpass fetch with endpoint fallback ─────────────────────────────────────
+// ── Fetch with manual timeout (AbortSignal.timeout not supported everywhere) ──
+function fetchWithTimeout(url: string, options: RequestInit, ms: number): Promise<Response> {
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), ms)
+  return fetch(url, { ...options, signal: ctrl.signal }).finally(() => clearTimeout(timer))
+}
+
+// ── Overpass POST with endpoint fallback ──────────────────────────────────────
 async function overpassPost(query: string): Promise<unknown> {
   const body = 'data=' + encodeURIComponent(query)
+  const opts: RequestInit = {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body,
+  }
   let lastError: Error = new Error('No endpoints available')
 
   for (const url of OVERPASS_ENDPOINTS) {
     try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body,
-        signal: AbortSignal.timeout(35_000),
-      })
+      const response = await fetchWithTimeout(url, opts, 35_000)
       if (!response.ok) {
-        lastError = new Error(`Overpass ${url} returned ${response.status}`)
+        lastError = new Error(`HTTP ${response.status} from ${url}`)
         continue
       }
       return await response.json()
@@ -95,7 +102,7 @@ async function overpassPost(query: string): Promise<unknown> {
   throw lastError
 }
 
-// ── POI fetcher ───────────────────────────────────────────────────────────────
+// ── POI fetcher — nodes + ways (beaches/hotels are often mapped as polygons) ──
 export async function fetchPOIs(
   lat: number,
   lon: number,
@@ -105,7 +112,7 @@ export async function fetchPOIs(
   if (_poiCache.has(destinationId)) return _poiCache.get(destinationId)!
 
   const latD = bboxDelta
-  const lonD = bboxDelta * 1.3  // slightly wider longitude window
+  const lonD = bboxDelta * 1.3
   const bbox = `${lat - latD},${lon - lonD},${lat + latD},${lon + lonD}`
 
   const query = `
@@ -114,16 +121,21 @@ export async function fetchPOIs(
   node["tourism"~"^(hotel|hostel|motel|guest_house|apartment)$"](${bbox});
   node["tourism"~"^(museum|attraction|gallery|viewpoint|theme_park|zoo|aquarium)$"](${bbox});
   node["historic"~"^(monument|castle|ruins|memorial|archaeological_site|church|cathedral)$"](${bbox});
-  node["amenity"~"^(restaurant|cafe|bar|ice_cream)$"](${bbox});
+  node["amenity"~"^(restaurant|cafe|bar|fast_food|ice_cream)$"](${bbox});
   node["natural"="beach"](${bbox});
   node["leisure"="beach_resort"](${bbox});
   node["tourism"="beach_resort"](${bbox});
   node["highway"="bus_stop"](${bbox});
   node["railway"~"^(station|subway_station|tram_stop)$"](${bbox});
-  node["amenity"="ferry_terminal"](${bbox});
+  node["amenity"~"^(ferry_terminal|bus_station)$"](${bbox});
   node["amenity"="bicycle_rental"](${bbox});
+  way["natural"="beach"](${bbox});
+  way["leisure"="beach_resort"](${bbox});
+  way["tourism"="beach_resort"](${bbox});
+  way["tourism"~"^(hotel|hostel|motel|museum|attraction|theme_park)$"](${bbox});
+  way["historic"~"^(castle|cathedral|ruins|archaeological_site)$"](${bbox});
 );
-out body 200;
+out center 200;
 `.trim()
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -131,10 +143,15 @@ out body 200;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pois: OverpassPOI[] = (json.elements ?? []).reduce((acc: OverpassPOI[], el: any) => {
-    if (el.type !== 'node') return acc
     const tags: Record<string, string> = el.tags ?? {}
     const poiType = classifyTags(tags)
     if (!poiType) return acc
+
+    // Nodes have lat/lon directly; ways have center.lat/center.lon
+    const elLat: number | undefined = el.type === 'node' ? el.lat : el.center?.lat
+    const elLon: number | undefined = el.type === 'node' ? el.lon : el.center?.lon
+    if (!elLat || !elLon) return acc
+
     const name = tags['name'] ?? tags['name:en'] ?? tags['name:es'] ?? `POI ${el.id}`
     const wmc = tags['wikimedia_commons']
     const wikimediaFile = wmc ? wmc.replace(/^File:/i, '').replace(/ /g, '_') : undefined
@@ -142,8 +159,8 @@ out body 200;
     acc.push({
       id:            el.id,
       type:          poiType,
-      lat:           el.lat,
-      lon:           el.lon,
+      lat:           elLat,
+      lon:           elLon,
       name,
       tags,
       wikiPage:      extractWikiPage(tags),
@@ -153,7 +170,8 @@ out body 200;
     return acc
   }, [])
 
-  _poiCache.set(destinationId, pois)
+  // Only cache when we have results — prevents empty-array lock-in on transient errors
+  if (pois.length > 0) _poiCache.set(destinationId, pois)
   return pois
 }
 

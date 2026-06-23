@@ -46,30 +46,35 @@ function TourFlowLogo() {
 }
 
 // ── Nav data ──────────────────────────────────────────────────────────────────
-type NavItem = { label: string; icon: React.ReactNode; active?: boolean; color: string }
+type NavItem = { label: string; icon: React.ReactNode; color: string; view: string }
 
 const NAV_GROUPS: { title?: string; items: NavItem[] }[] = [
   {
     items: [
-      { label: 'Inicio',               icon: <DashboardIcon      sx={{ fontSize: 16 }} />, active: true, color: '#0DD3C5' },
-      { label: 'Mapa interactivo',     icon: <MapIcon            sx={{ fontSize: 16 }} />,               color: '#818CF8' },
-      { label: 'Accesibilidad',        icon: <AccessibleIcon     sx={{ fontSize: 16 }} />,               color: '#10B981' },
-      { label: 'Movilidad sostenible', icon: <DirectionsBikeIcon sx={{ fontSize: 16 }} />,               color: '#F59E0B' },
-      { label: 'Rutas turísticas',     icon: <RouteIcon          sx={{ fontSize: 16 }} />,               color: '#F97316' },
+      { label: 'Inicio',               icon: <DashboardIcon      sx={{ fontSize: 16 }} />, color: '#C05928', view: 'home' },
+      { label: 'Mapa interactivo',     icon: <MapIcon            sx={{ fontSize: 16 }} />, color: '#818CF8', view: 'map'  },
+      { label: 'Accesibilidad',        icon: <AccessibleIcon     sx={{ fontSize: 16 }} />, color: '#10B981', view: 'map'  },
+      { label: 'Movilidad sostenible', icon: <DirectionsBikeIcon sx={{ fontSize: 16 }} />, color: '#F59E0B', view: 'map'  },
+      { label: 'Rutas turísticas',     icon: <RouteIcon          sx={{ fontSize: 16 }} />, color: '#F97316', view: 'map'  },
     ],
   },
   {
     title: 'IA & Análisis',
     items: [
-      { label: 'Recomendaciones IA',   icon: <AutoAwesomeIcon    sx={{ fontSize: 16 }} />,               color: '#A78BFA' },
-      { label: 'Análisis',             icon: <AnalyticsIcon      sx={{ fontSize: 16 }} />,               color: '#38BDF8' },
-      { label: 'Informes',             icon: <AssessmentIcon     sx={{ fontSize: 16 }} />,               color: '#34D399' },
+      { label: 'Recomendaciones IA',   icon: <AutoAwesomeIcon    sx={{ fontSize: 16 }} />, color: '#A78BFA', view: 'home' },
+      { label: 'Análisis',             icon: <AnalyticsIcon      sx={{ fontSize: 16 }} />, color: '#38BDF8', view: 'home' },
+      { label: 'Informes',             icon: <AssessmentIcon     sx={{ fontSize: 16 }} />, color: '#34D399', view: 'home' },
     ],
   },
 ]
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export default function Sidebar() {
+interface SidebarProps {
+  currentView: string
+  onNavigate: (view: string) => void
+}
+
+export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
   const { destination, setDestination } = useDestination()
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null)
   const photo = useDestinationPhoto(destination.id, destination.name)
@@ -150,40 +155,42 @@ export default function Sidebar() {
               </Box>
             )}
 
-            {group.items.map((item) => (
-              <Box key={item.label} sx={{
-                display: 'flex', alignItems: 'center', gap: 1,
-                px: 1, py: 0.6, borderRadius: '10px', mb: 0.25,
-                cursor: 'pointer',
-                background: item.active ? 'rgba(255,255,255,0.12)' : 'transparent',
-                borderLeft: item.active ? '3px solid #C05928' : '3px solid transparent',
-                transition: 'all 0.15s',
-                '&:hover': {
-                  background: item.active ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)',
-                },
-              }}>
-                {/* Icon container */}
-                <Box sx={{
-                  width: 28, height: 28, borderRadius: '7px', flexShrink: 0,
-                  background: item.active ? 'rgba(255,255,255,0.15)' : 'transparent',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: item.active ? '#F8FAFC' : 'rgba(255,255,255,0.4)',
-                  transition: 'all 0.15s',
-                }}>
-                  {item.icon}
-                </Box>
+            {group.items.map((item) => {
+              const isActive = item.view === currentView &&
+                (item.label === 'Inicio' || item.label === 'Mapa interactivo')
 
-                <Typography sx={{
-                  fontSize: '0.75rem',
-                  fontWeight: item.active ? 600 : 400,
-                  color: item.active ? '#F8FAFC' : 'rgba(255,255,255,0.55)',
-                  transition: 'color 0.15s',
-                  flex: 1,
+              return (
+                <Box key={item.label} onClick={() => onNavigate(item.view)} sx={{
+                  display: 'flex', alignItems: 'center', gap: 1,
+                  px: 1, py: 0.6, borderRadius: '10px', mb: 0.25,
+                  cursor: 'pointer',
+                  background: isActive ? 'rgba(255,255,255,0.12)' : 'transparent',
+                  borderLeft: isActive ? '3px solid #C05928' : '3px solid transparent',
+                  transition: 'all 0.15s',
+                  '&:hover': {
+                    background: isActive ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)',
+                  },
                 }}>
-                  {item.label}
-                </Typography>
-              </Box>
-            ))}
+                  <Box sx={{
+                    width: 28, height: 28, borderRadius: '7px', flexShrink: 0,
+                    background: isActive ? 'rgba(255,255,255,0.15)' : 'transparent',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: isActive ? '#F8FAFC' : 'rgba(255,255,255,0.4)',
+                    transition: 'all 0.15s',
+                  }}>
+                    {item.icon}
+                  </Box>
+                  <Typography sx={{
+                    fontSize: '0.75rem',
+                    fontWeight: isActive ? 600 : 400,
+                    color: isActive ? '#F8FAFC' : 'rgba(255,255,255,0.55)',
+                    transition: 'color 0.15s', flex: 1,
+                  }}>
+                    {item.label}
+                  </Typography>
+                </Box>
+              )
+            })}
           </Box>
         ))}
       </Box>

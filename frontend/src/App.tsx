@@ -12,6 +12,12 @@ import EvolutionChart from './components/EvolutionChart'
 import ModalDonut from './components/ModalDonut'
 import OpportunitiesPanel from './components/OpportunitiesPanel'
 import InteractiveMapView from './components/InteractiveMapView'
+import AccessibilityView from './components/AccessibilityView'
+import MobilityView from './components/MobilityView'
+import TouristRoutesView from './components/TouristRoutesView'
+import AIRecsView from './components/AIRecsView'
+import AnalyticsView from './components/AnalyticsView'
+import ReportsView from './components/ReportsView'
 import './index.css'
 
 const sidebarTheme = createTheme({
@@ -50,9 +56,9 @@ export default function App() {
           {/* Background + content wrapper */}
           <Box sx={{
             position: 'relative', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden',
-            background: currentView === 'map'
-              ? '#fff'
-              : 'linear-gradient(170deg, #C6DCF0 0%, #D5E8F5 30%, #E2EFF8 60%, #EDF5FB 100%)',
+            background: currentView === 'home'
+              ? 'linear-gradient(170deg, #C6DCF0 0%, #D5E8F5 30%, #E2EFF8 60%, #EDF5FB 100%)'
+              : '#FAFAF8',
           }}>
 
             {/* TopBar — always visible */}
@@ -104,6 +110,38 @@ export default function App() {
             {currentView === 'map' && (
               <Box sx={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0, position: 'relative', zIndex: 1 }}>
                 <InteractiveMapView />
+              </Box>
+            )}
+
+            {/* Secondary views */}
+            {currentView === 'accessibility' && (
+              <Box sx={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0, position: 'relative', zIndex: 1 }}>
+                <AccessibilityView />
+              </Box>
+            )}
+            {currentView === 'mobility' && (
+              <Box sx={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0, position: 'relative', zIndex: 1 }}>
+                <MobilityView />
+              </Box>
+            )}
+            {currentView === 'routes' && (
+              <Box sx={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0, position: 'relative', zIndex: 1 }}>
+                <TouristRoutesView />
+              </Box>
+            )}
+            {currentView === 'ai-recs' && (
+              <Box sx={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0, position: 'relative', zIndex: 1 }}>
+                <AIRecsView />
+              </Box>
+            )}
+            {currentView === 'analytics' && (
+              <Box sx={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0, position: 'relative', zIndex: 1 }}>
+                <AnalyticsView />
+              </Box>
+            )}
+            {currentView === 'reports' && (
+              <Box sx={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0, position: 'relative', zIndex: 1 }}>
+                <ReportsView />
               </Box>
             )}
           </Box>

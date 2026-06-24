@@ -51,19 +51,19 @@ type NavItem = { label: string; icon: React.ReactNode; color: string; view: stri
 const NAV_GROUPS: { title?: string; items: NavItem[] }[] = [
   {
     items: [
-      { label: 'Inicio',               icon: <DashboardIcon      sx={{ fontSize: 16 }} />, color: '#C05928', view: 'home' },
-      { label: 'Mapa interactivo',     icon: <MapIcon            sx={{ fontSize: 16 }} />, color: '#818CF8', view: 'map'  },
-      { label: 'Accesibilidad',        icon: <AccessibleIcon     sx={{ fontSize: 16 }} />, color: '#10B981', view: 'map'  },
-      { label: 'Movilidad sostenible', icon: <DirectionsBikeIcon sx={{ fontSize: 16 }} />, color: '#F59E0B', view: 'map'  },
-      { label: 'Rutas turísticas',     icon: <RouteIcon          sx={{ fontSize: 16 }} />, color: '#F97316', view: 'map'  },
+      { label: 'Inicio',               icon: <DashboardIcon      sx={{ fontSize: 16 }} />, color: '#C05928', view: 'home'          },
+      { label: 'Mapa interactivo',     icon: <MapIcon            sx={{ fontSize: 16 }} />, color: '#818CF8', view: 'map'           },
+      { label: 'Accesibilidad',        icon: <AccessibleIcon     sx={{ fontSize: 16 }} />, color: '#10B981', view: 'accessibility'  },
+      { label: 'Movilidad sostenible', icon: <DirectionsBikeIcon sx={{ fontSize: 16 }} />, color: '#F59E0B', view: 'mobility'       },
+      { label: 'Rutas turísticas',     icon: <RouteIcon          sx={{ fontSize: 16 }} />, color: '#F97316', view: 'routes'         },
     ],
   },
   {
     title: 'IA & Análisis',
     items: [
-      { label: 'Recomendaciones IA',   icon: <AutoAwesomeIcon    sx={{ fontSize: 16 }} />, color: '#A78BFA', view: 'home' },
-      { label: 'Análisis',             icon: <AnalyticsIcon      sx={{ fontSize: 16 }} />, color: '#38BDF8', view: 'home' },
-      { label: 'Informes',             icon: <AssessmentIcon     sx={{ fontSize: 16 }} />, color: '#34D399', view: 'home' },
+      { label: 'Recomendaciones IA',   icon: <AutoAwesomeIcon    sx={{ fontSize: 16 }} />, color: '#A78BFA', view: 'ai-recs'        },
+      { label: 'Análisis',             icon: <AnalyticsIcon      sx={{ fontSize: 16 }} />, color: '#38BDF8', view: 'analytics'      },
+      { label: 'Informes',             icon: <AssessmentIcon     sx={{ fontSize: 16 }} />, color: '#34D399', view: 'reports'        },
     ],
   },
 ]
@@ -156,8 +156,7 @@ export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
             )}
 
             {group.items.map((item) => {
-              const isActive = item.view === currentView &&
-                (item.label === 'Inicio' || item.label === 'Mapa interactivo')
+              const isActive = item.view === currentView
 
               return (
                 <Box key={item.label} onClick={() => onNavigate(item.view)} sx={{

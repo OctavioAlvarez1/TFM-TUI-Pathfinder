@@ -23,9 +23,24 @@ export interface CyclePath {
   color: string
 }
 
-// ── In-memory caches — only populated on success with results ─────────────────
-const _poiCache  = new Map<string, OverpassPOI[]>()
-const _pathCache = new Map<string, CyclePath[]>()
+// ── In-memory caches ──────────────────────────────────────────────────────────
+const _poiCache     = new Map<string, OverpassPOI[]>()
+const _pathCache    = new Map<string, CyclePath[]>()
+const _transitCache = new Map<string, TransitRoute[]>()
+
+// ── localStorage persistence ──────────────────────────────────────────────────
+const LS = (k: string) => `pathfinder_osm_${k}`
+
+function lsGet<T>(key: string): T | null {
+  try {
+    const raw = localStorage.getItem(key)
+    return raw ? (JSON.parse(raw) as T) : null
+  } catch { return null }
+}
+
+function lsSet(key: string, value: unknown): void {
+  try { localStorage.setItem(key, JSON.stringify(value)) } catch { /* quota */ }
+}
 
 // ── Tag classification ────────────────────────────────────────────────────────
 export function classifyTags(tags: Record<string, string>): POIType | null {
@@ -70,14 +85,57 @@ export function extractWikiPage(tags: Record<string, string>): string | undefine
   return undefined
 }
 
-// ── Fetch with manual timeout (AbortSignal.timeout not supported everywhere) ──
+// ── Mock POI fallback — deterministic per destination ─────────────────────────
+function seededRng(seed: number): () => number {
+  let s = seed
+  return () => {
+    s = (s * 1664525 + 1013904223) & 0xffffffff
+    return (s >>> 0) / 0xffffffff
+  }
+}
+
+export function generateMockPOIs(destinationId: string, lat: number, lon: number): OverpassPOI[] {
+  let seed = 0
+  for (const c of destinationId) seed = (seed * 31 + c.charCodeAt(0)) & 0xffffff
+  const rng = seededRng(seed)
+
+  const templates: { type: POIType; names: string[] }[] = [
+    { type: 'hotel',     names: ['Hotel Central', 'Hotel Plaza', 'Hotel Palacio', 'Hotel Jardín', 'Hotel Sol', 'Hotel Marina'] },
+    { type: 'monument',  names: ['Catedral', 'Palacio Municipal', 'Museo de Arte', 'Plaza Mayor', 'Basílica', 'Museo de Historia'] },
+    { type: 'restaurant',names: ['Restaurante El Rincón', 'Café del Mar', 'La Taberna', 'Restaurante Plaza', 'Bar El Puerto', 'La Bodega'] },
+    { type: 'transport', names: ['Estación Central', 'Parada Bus Centro', 'Metro Plaza', 'Terminal Bus', 'Estación Norte'] },
+    { type: 'bike',      names: ['Estación Bici Centro', 'Bici Plaza Mayor', 'Alquiler Bicicletas', 'Cicloestación Sur', 'Bici Norte'] },
+  ]
+
+  const pois: OverpassPOI[] = []
+  let mockId = -1
+
+  for (const tmpl of templates) {
+    for (const name of tmpl.names) {
+      const dlat = (rng() - 0.5) * 0.06
+      const dlon = (rng() - 0.5) * 0.08
+      pois.push({
+        id: mockId--,
+        type: tmpl.type,
+        lat: lat + dlat,
+        lon: lon + dlon,
+        name,
+        tags: {},
+      })
+    }
+  }
+
+  return pois
+}
+
+// ── Fetch with timeout ────────────────────────────────────────────────────────
 function fetchWithTimeout(url: string, options: RequestInit, ms: number): Promise<Response> {
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), ms)
   return fetch(url, { ...options, signal: ctrl.signal }).finally(() => clearTimeout(timer))
 }
 
-// ── Overpass POST with endpoint fallback ──────────────────────────────────────
+// ── Overpass POST — both endpoints in parallel, first response wins ───────────
 async function overpassPost(query: string): Promise<unknown> {
   const body = 'data=' + encodeURIComponent(query)
   const opts: RequestInit = {
@@ -85,38 +143,39 @@ async function overpassPost(query: string): Promise<unknown> {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body,
   }
-  let lastError: Error = new Error('No endpoints available')
 
-  for (const url of OVERPASS_ENDPOINTS) {
-    try {
-      const response = await fetchWithTimeout(url, opts, 35_000)
-      if (!response.ok) {
-        lastError = new Error(`HTTP ${response.status} from ${url}`)
-        continue
-      }
-      return await response.json()
-    } catch (e) {
-      lastError = e instanceof Error ? e : new Error(String(e))
-    }
-  }
-  throw lastError
+  const attempts = OVERPASS_ENDPOINTS.map(async url => {
+    const response = await fetchWithTimeout(url, opts, 10_000)
+    if (!response.ok) throw new Error(`HTTP ${response.status} from ${url}`)
+    return response.json()
+  })
+
+  return Promise.any(attempts)
 }
 
-// ── POI fetcher — nodes + ways (beaches/hotels are often mapped as polygons) ──
+// ── POI fetcher ───────────────────────────────────────────────────────────────
 export async function fetchPOIs(
   lat: number,
   lon: number,
   destinationId: string,
   bboxDelta = 0.05,
 ): Promise<OverpassPOI[]> {
+  // 1. In-memory cache
   if (_poiCache.has(destinationId)) return _poiCache.get(destinationId)!
+
+  // 2. localStorage cache
+  const stored = lsGet<OverpassPOI[]>(LS(`pois_${destinationId}`))
+  if (stored && stored.length > 0) {
+    _poiCache.set(destinationId, stored)
+    return stored
+  }
 
   const latD = bboxDelta
   const lonD = bboxDelta * 1.3
   const bbox = `${lat - latD},${lon - lonD},${lat + latD},${lon + lonD}`
 
   const query = `
-[out:json][timeout:30];
+[out:json][timeout:25];
 (
   node["tourism"~"^(hotel|hostel|motel|guest_house|apartment)$"](${bbox});
   node["tourism"~"^(museum|attraction|gallery|viewpoint|theme_park|zoo|aquarium)$"](${bbox});
@@ -138,54 +197,59 @@ export async function fetchPOIs(
 out center 200;
 `.trim()
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const json = await overpassPost(query) as any
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const json = await overpassPost(query) as any
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const pois: OverpassPOI[] = (json.elements ?? []).reduce((acc: OverpassPOI[], el: any) => {
-    const tags: Record<string, string> = el.tags ?? {}
-    const poiType = classifyTags(tags)
-    if (!poiType) return acc
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pois: OverpassPOI[] = (json.elements ?? []).reduce((acc: OverpassPOI[], el: any) => {
+      const tags: Record<string, string> = el.tags ?? {}
+      const poiType = classifyTags(tags)
+      if (!poiType) return acc
 
-    // Nodes have lat/lon directly; ways have center.lat/center.lon
-    const elLat: number | undefined = el.type === 'node' ? el.lat : el.center?.lat
-    const elLon: number | undefined = el.type === 'node' ? el.lon : el.center?.lon
-    if (!elLat || !elLon) return acc
+      const elLat: number | undefined = el.type === 'node' ? el.lat : el.center?.lat
+      const elLon: number | undefined = el.type === 'node' ? el.lon : el.center?.lon
+      if (!elLat || !elLon) return acc
 
-    const name = tags['name'] ?? tags['name:en'] ?? tags['name:es'] ?? `POI ${el.id}`
-    const wmc = tags['wikimedia_commons']
-    const wikimediaFile = wmc ? wmc.replace(/^File:/i, '').replace(/ /g, '_') : undefined
+      const name = tags['name'] ?? tags['name:en'] ?? tags['name:es'] ?? `POI ${el.id}`
+      const wmc = tags['wikimedia_commons']
+      const wikimediaFile = wmc ? wmc.replace(/^File:/i, '').replace(/ /g, '_') : undefined
 
-    acc.push({
-      id:            el.id,
-      type:          poiType,
-      lat:           elLat,
-      lon:           elLon,
-      name,
-      tags,
-      wikiPage:      extractWikiPage(tags),
-      imageUrl:      tags['image'] || undefined,
-      wikimediaFile,
-    })
-    return acc
-  }, [])
+      acc.push({
+        id:            el.id,
+        type:          poiType,
+        lat:           elLat,
+        lon:           elLon,
+        name,
+        tags,
+        wikiPage:      extractWikiPage(tags),
+        imageUrl:      tags['image'] || undefined,
+        wikimediaFile,
+      })
+      return acc
+    }, [])
 
-  // Only cache when we have results — prevents empty-array lock-in on transient errors
-  if (pois.length > 0) _poiCache.set(destinationId, pois)
-  return pois
+    if (pois.length > 0) {
+      _poiCache.set(destinationId, pois)
+      lsSet(LS(`pois_${destinationId}`), pois)
+      return pois
+    }
+  } catch { /* fall through to mock */ }
+
+  // 3. Fallback: mock POIs
+  const mock = generateMockPOIs(destinationId, lat, lon)
+  return mock
 }
 
-// ── Transit route fetcher (metro / tram / light_rail) ────────────────────────
+// ── Transit route fetcher ─────────────────────────────────────────────────────
 export interface TransitRoute {
   id: number
   name: string
   ref: string
   routeType: string
   color: string
-  segments: [number, number][][]  // one polyline per way member
+  segments: [number, number][][]
 }
-
-const _transitCache = new Map<string, TransitRoute[]>()
 
 function transitDefaultColor(routeType: string): string {
   if (routeType === 'subway' || routeType === 'metro') return '#1A3C5E'
@@ -201,12 +265,18 @@ export async function fetchTransitRoutes(
 ): Promise<TransitRoute[]> {
   if (_transitCache.has(destinationId)) return _transitCache.get(destinationId)!
 
+  const stored = lsGet<TransitRoute[]>(LS(`transit_${destinationId}`))
+  if (stored && stored.length > 0) {
+    _transitCache.set(destinationId, stored)
+    return stored
+  }
+
   const latD = bboxDelta
   const lonD = bboxDelta * 1.3
   const bbox = `${lat - latD},${lon - lonD},${lat + latD},${lon + lonD}`
 
   const query = `
-[out:json][timeout:30];
+[out:json][timeout:25];
 (
   relation["type"="route"]["route"~"^(subway|metro|tram|light_rail)$"](${bbox});
 );
@@ -247,7 +317,10 @@ out geom;
       })
     }
 
-    if (routes.length > 0) _transitCache.set(destinationId, routes)
+    if (routes.length > 0) {
+      _transitCache.set(destinationId, routes)
+      lsSet(LS(`transit_${destinationId}`), routes)
+    }
     return routes
   } catch {
     return []
@@ -263,26 +336,37 @@ export async function fetchCyclePaths(
 ): Promise<CyclePath[]> {
   if (_pathCache.has(destinationId)) return _pathCache.get(destinationId)!
 
+  const stored = lsGet<CyclePath[]>(LS(`paths_${destinationId}`))
+  if (stored && stored.length > 0) {
+    _pathCache.set(destinationId, stored)
+    return stored
+  }
+
   const latD = bboxDelta
   const lonD = bboxDelta * 1.3
   const bbox = `${lat - latD},${lon - lonD},${lat + latD},${lon + lonD}`
 
   const query = `
-[out:json][timeout:25];
+[out:json][timeout:20];
 way["highway"="cycleway"](${bbox});
 out geom 30;
 `.trim()
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const json = await overpassPost(query) as any
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const json = await overpassPost(query) as any
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const paths: CyclePath[] = (json.elements ?? []).map((el: any) => ({
-    id:     String(el.id),
-    coords: (el.geometry ?? []).map((g: { lat: number; lon: number }) => [g.lat, g.lon] as [number, number]),
-    color:  '#10B981',
-  }))
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const paths: CyclePath[] = (json.elements ?? []).map((el: any) => ({
+      id:     String(el.id),
+      coords: (el.geometry ?? []).map((g: { lat: number; lon: number }) => [g.lat, g.lon] as [number, number]),
+      color:  '#10B981',
+    }))
 
-  _pathCache.set(destinationId, paths)
-  return paths
+    _pathCache.set(destinationId, paths)
+    lsSet(LS(`paths_${destinationId}`), paths)
+    return paths
+  } catch {
+    return []
+  }
 }

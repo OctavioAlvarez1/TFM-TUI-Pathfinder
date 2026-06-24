@@ -8,6 +8,7 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime'
 import LocationOnIcon from '@mui/icons-material/LocationOn'
 import { getDestinationKPIs } from '../data/mockData'
 import { useDestination } from '../context/DestinationContext'
+import { useLanguage } from '../context/LanguageContext'
 
 const ICONS = [
   <AccessibleIcon        sx={{ fontSize: 20 }} />,
@@ -20,7 +21,8 @@ const ICONS = [
 
 export default function KPIBar() {
   const { destination } = useDestination()
-  const kpis = getDestinationKPIs(destination.id)
+  const { lang } = useLanguage()
+  const kpis = getDestinationKPIs(destination.id, lang)
 
   return (
     <Box sx={{

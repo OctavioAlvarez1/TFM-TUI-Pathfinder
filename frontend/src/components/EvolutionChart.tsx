@@ -4,18 +4,27 @@ import ShowChartIcon from '@mui/icons-material/ShowChart'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { getDestinationEvolution } from '../data/mockData'
 import { useDestination } from '../context/DestinationContext'
+import { useLanguage } from '../context/LanguageContext'
 
-const LINES = [
-  { key: 'accesibilidad', color: '#1A3C5E', label: 'Accesibilidad' },
-  { key: 'movilidad',     color: '#2D6A4F', label: 'Movilidad'     },
-  { key: 'transporte',    color: '#2E7D98', label: 'Transporte', dash: '4 2' },
-  { key: 'sostenibilidad',color: '#C05928', label: 'Sostenibilidad'},
+const LINE_KEYS = [
+  { key: 'accesibilidad', color: '#1A3C5E', labelKey: 'chart.line.access' as const },
+  { key: 'movilidad',     color: '#2D6A4F', labelKey: 'chart.line.mobility' as const },
+  { key: 'transporte',    color: '#2E7D98', labelKey: 'chart.line.transport' as const, dash: '4 2' },
+  { key: 'sostenibilidad',color: '#C05928', labelKey: 'chart.line.sustain' as const },
 ]
 
 export default function EvolutionChart() {
   const [period, setPeriod] = useState('6m')
   const { destination } = useDestination()
-  const evolutionData = getDestinationEvolution(destination.id)
+  const { t, lang } = useLanguage()
+  const rawData = getDestinationEvolution(destination.id)
+
+  const monthNames = t('chart.months').split(',')
+  const evolutionData = rawData.map((row, i) => ({ ...row, mes: monthNames[i] ?? row.mes }))
+
+  const periodLabel = lang === 'en'
+    ? { '3m': 'Last 3 months', '6m': 'Last 6 months', '1y': 'Last year' }
+    : { '3m': 'Últimos 3 meses', '6m': 'Últimos 6 meses', '1y': 'Último año' }
 
   return (
     <Box sx={{
@@ -39,7 +48,7 @@ export default function EvolutionChart() {
             <ShowChartIcon sx={{ fontSize: 16, color: '#1A3C5E' }} />
           </Box>
           <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, color: '#1E293B' }}>
-            Evolución de métricas
+            {t('chart.evolution.title')}
           </Typography>
         </Box>
         <Select
@@ -55,9 +64,9 @@ export default function EvolutionChart() {
             '& .MuiSelect-icon': { color: '#64748B', fontSize: 16 },
           }}
         >
-          <MenuItem value="3m" sx={{ fontSize: '0.72rem' }}>Últimos 3 meses</MenuItem>
-          <MenuItem value="6m" sx={{ fontSize: '0.72rem' }}>Últimos 6 meses</MenuItem>
-          <MenuItem value="1y" sx={{ fontSize: '0.72rem' }}>Último año</MenuItem>
+          {(['3m', '6m', '1y'] as const).map(p => (
+            <MenuItem key={p} value={p} sx={{ fontSize: '0.72rem' }}>{periodLabel[p]}</MenuItem>
+          ))}
         </Select>
       </Box>
 
@@ -75,11 +84,12 @@ export default function EvolutionChart() {
               boxShadow: '0 4px 16px rgba(129,140,248,0.15)',
             }}
           />
-          {LINES.map(l => (
+          {LINE_KEYS.map(l => (
             <Line
               key={l.key}
               type="monotone"
               dataKey={l.key}
+              name={t(l.labelKey)}
               stroke={l.color}
               strokeWidth={2.5}
               dot={false}
@@ -90,12 +100,14 @@ export default function EvolutionChart() {
       </ResponsiveContainer>
 
       <Box sx={{ display: 'flex', gap: 1.5, mt: 0.8, flexWrap: 'wrap' }}>
-        {LINES.map(l => (
+        {LINE_KEYS.map(l => (
           <Box key={l.key} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
             <Box sx={{ width: 16, height: 2.5, background: l.color, borderRadius: 2,
                         borderBottom: l.dash ? `2px dashed ${l.color}` : undefined,
                         background: l.dash ? 'none' : l.color }} />
-            <Typography sx={{ fontSize: '0.65rem', color: '#64748B', fontWeight: 500 }}>{l.label}</Typography>
+            <Typography sx={{ fontSize: '0.65rem', color: '#64748B', fontWeight: 500 }}>
+              {t(l.labelKey)}
+            </Typography>
           </Box>
         ))}
       </Box>

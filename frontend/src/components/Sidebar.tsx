@@ -13,6 +13,7 @@ import SettingsIcon          from '@mui/icons-material/Settings'
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown'
 import LocationOnIcon        from '@mui/icons-material/LocationOn'
 import { useDestination }    from '../context/DestinationContext'
+import { useLanguage }       from '../context/LanguageContext'
 import { SPANISH_DESTINATIONS } from '../data/destinations'
 
 // ── Logo SVG ──────────────────────────────────────────────────────────────────
@@ -45,29 +46,6 @@ function TourFlowLogo() {
   )
 }
 
-// ── Nav data ──────────────────────────────────────────────────────────────────
-type NavItem = { label: string; icon: React.ReactNode; color: string; view: string }
-
-const NAV_GROUPS: { title?: string; items: NavItem[] }[] = [
-  {
-    items: [
-      { label: 'Inicio',               icon: <DashboardIcon      sx={{ fontSize: 16 }} />, color: '#C05928', view: 'home'          },
-      { label: 'Mapa interactivo',     icon: <MapIcon            sx={{ fontSize: 16 }} />, color: '#818CF8', view: 'map'           },
-      { label: 'Accesibilidad',        icon: <AccessibleIcon     sx={{ fontSize: 16 }} />, color: '#10B981', view: 'accessibility'  },
-      { label: 'Movilidad sostenible', icon: <DirectionsBikeIcon sx={{ fontSize: 16 }} />, color: '#F59E0B', view: 'mobility'       },
-      { label: 'Rutas turísticas',     icon: <RouteIcon          sx={{ fontSize: 16 }} />, color: '#F97316', view: 'routes'         },
-    ],
-  },
-  {
-    title: 'IA & Análisis',
-    items: [
-      { label: 'Recomendaciones IA',   icon: <AutoAwesomeIcon    sx={{ fontSize: 16 }} />, color: '#A78BFA', view: 'ai-recs'        },
-      { label: 'Análisis',             icon: <AnalyticsIcon      sx={{ fontSize: 16 }} />, color: '#38BDF8', view: 'analytics'      },
-      { label: 'Informes',             icon: <AssessmentIcon     sx={{ fontSize: 16 }} />, color: '#34D399', view: 'reports'        },
-    ],
-  },
-]
-
 // ── Component ─────────────────────────────────────────────────────────────────
 interface SidebarProps {
   currentView: string
@@ -76,10 +54,31 @@ interface SidebarProps {
 
 export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
   const { destination, setDestination } = useDestination()
+  const { t } = useLanguage()
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null)
   const photo = useDestinationPhoto(destination.id, destination.name)
   const cardQuery = CARD_QUERIES[destination.id] ?? destination.name
   const cardPhoto = useDestinationPhoto(destination.id + '_card', cardQuery)
+
+  const NAV_GROUPS = [
+    {
+      items: [
+        { labelKey: 'nav.home',     icon: <DashboardIcon      sx={{ fontSize: 16 }} />, color: '#C05928', view: 'home'         },
+        { labelKey: 'nav.map',      icon: <MapIcon            sx={{ fontSize: 16 }} />, color: '#818CF8', view: 'map'          },
+        { labelKey: 'nav.access',   icon: <AccessibleIcon     sx={{ fontSize: 16 }} />, color: '#10B981', view: 'accessibility' },
+        { labelKey: 'nav.mobility', icon: <DirectionsBikeIcon sx={{ fontSize: 16 }} />, color: '#F59E0B', view: 'mobility'      },
+        { labelKey: 'nav.routes',   icon: <RouteIcon          sx={{ fontSize: 16 }} />, color: '#F97316', view: 'routes'        },
+      ],
+    },
+    {
+      titleKey: 'nav.group.ai' as const,
+      items: [
+        { labelKey: 'nav.ai',        icon: <AutoAwesomeIcon sx={{ fontSize: 16 }} />, color: '#A78BFA', view: 'ai-recs'   },
+        { labelKey: 'nav.analytics', icon: <AnalyticsIcon   sx={{ fontSize: 16 }} />, color: '#38BDF8', view: 'analytics' },
+        { labelKey: 'nav.reports',   icon: <AssessmentIcon  sx={{ fontSize: 16 }} />, color: '#34D399', view: 'reports'   },
+      ],
+    },
+  ]
 
   return (
     <Box sx={{
@@ -100,7 +99,6 @@ export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
       borderRight: 'none',
       position: 'relative',
     }}>
-
 
       {/* ── Logo header ── */}
       <Box sx={{
@@ -145,11 +143,11 @@ export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
       }}>
         {NAV_GROUPS.map((group, gi) => (
           <Box key={gi} sx={{ mb: 0.5 }}>
-            {group.title && (
+            {'titleKey' in group && group.titleKey && (
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1, pt: 1.2, pb: 0.6 }}>
                 <Typography sx={{ fontSize: '0.58rem', color: 'rgba(255,255,255,0.35)', fontWeight: 700,
                                    textTransform: 'uppercase', letterSpacing: '0.1em', whiteSpace: 'nowrap' }}>
-                  {group.title}
+                  {t(group.titleKey)}
                 </Typography>
                 <Box sx={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, rgba(255,255,255,0.15), transparent)' }} />
               </Box>
@@ -157,9 +155,8 @@ export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
 
             {group.items.map((item) => {
               const isActive = item.view === currentView
-
               return (
-                <Box key={item.label} onClick={() => onNavigate(item.view)} sx={{
+                <Box key={item.view} onClick={() => onNavigate(item.view)} sx={{
                   display: 'flex', alignItems: 'center', gap: 1,
                   px: 1, py: 0.6, borderRadius: '10px', mb: 0.25,
                   cursor: 'pointer',
@@ -185,7 +182,7 @@ export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
                     color: isActive ? '#F8FAFC' : 'rgba(255,255,255,0.55)',
                     transition: 'color 0.15s', flex: 1,
                   }}>
-                    {item.label}
+                    {t(item.labelKey)}
                   </Typography>
                 </Box>
               )
@@ -211,15 +208,14 @@ export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
           }}>
             <SettingsIcon sx={{ fontSize: 16 }} />
           </Box>
-          <Typography sx={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.45)' }}>Configuración</Typography>
+          <Typography sx={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.45)' }}>
+            {t('nav.settings')}
+          </Typography>
         </Box>
       </Box>
 
       {/* ── Destination card ── */}
-      {/* Glow aura behind the card */}
-      <Box sx={{
-        mx: 1.2, mb: 1.5, position: 'relative', zIndex: 1,
-      }}>
+      <Box sx={{ mx: 1.2, mb: 1.5, position: 'relative', zIndex: 1 }}>
         <Box sx={{
           position: 'absolute', inset: '-8px', borderRadius: '20px',
           background: 'radial-gradient(ellipse at 50% 60%, rgba(46,125,152,0.28) 0%, transparent 70%)',
@@ -233,61 +229,60 @@ export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
           backdropFilter: 'blur(8px)',
           background: 'rgba(255,255,255,0.04)',
         }}>
-        {/* Destination photo */}
-        <Box sx={{
-          height: 90,
-          background: 'linear-gradient(135deg, #081520 0%, #1A3C5E 60%, #1E5080 100%)',
-          position: 'relative', overflow: 'hidden',
-        }}>
-          {cardPhoto && (
-            <Box
-              component="img"
-              src={cardPhoto}
-              alt={destination.region}
-              sx={{
-                position: 'absolute', inset: 0, width: '100%', height: '100%',
-                objectFit: 'cover', objectPosition: 'center',
-                maskImage: 'linear-gradient(to right, black 45%, transparent 100%)',
-                WebkitMaskImage: 'linear-gradient(to right, black 45%, transparent 100%)',
-                transition: 'opacity 0.4s ease',
-              }}
-            />
-          )}
-          {/* Bottom fade into button row */}
           <Box sx={{
-            position: 'absolute', bottom: 0, left: 0, right: 0, height: 28,
-            background: 'linear-gradient(to top, rgba(8,21,32,0.7) 0%, transparent 100%)',
-            pointerEvents: 'none',
-          }} />
-          <Box sx={{ position: 'absolute', bottom: 8, left: 10, zIndex: 2 }}>
-            <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: '#fff', lineHeight: 1.2,
-                               textShadow: '0 1px 6px rgba(0,0,0,0.7)' }}>
-              {destination.name}
+            height: 90,
+            background: 'linear-gradient(135deg, #081520 0%, #1A3C5E 60%, #1E5080 100%)',
+            position: 'relative', overflow: 'hidden',
+          }}>
+            {cardPhoto && (
+              <Box
+                component="img"
+                src={cardPhoto}
+                alt={destination.region}
+                sx={{
+                  position: 'absolute', inset: 0, width: '100%', height: '100%',
+                  objectFit: 'cover', objectPosition: 'center',
+                  maskImage: 'linear-gradient(to right, black 45%, transparent 100%)',
+                  WebkitMaskImage: 'linear-gradient(to right, black 45%, transparent 100%)',
+                  transition: 'opacity 0.4s ease',
+                }}
+              />
+            )}
+            <Box sx={{
+              position: 'absolute', bottom: 0, left: 0, right: 0, height: 28,
+              background: 'linear-gradient(to top, rgba(8,21,32,0.7) 0%, transparent 100%)',
+              pointerEvents: 'none',
+            }} />
+            <Box sx={{ position: 'absolute', bottom: 8, left: 10, zIndex: 2 }}>
+              <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: '#fff', lineHeight: 1.2,
+                                 textShadow: '0 1px 6px rgba(0,0,0,0.7)' }}>
+                {destination.name}
+              </Typography>
+              <Typography sx={{ fontSize: '0.54rem', color: 'rgba(255,255,255,0.65)',
+                                 textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}>
+                {destination.region}
+              </Typography>
+            </Box>
+          </Box>
+
+          <Box
+            onClick={(e) => setMenuAnchor(e.currentTarget)}
+            sx={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              px: 1.2, py: 0.65,
+              background: 'transparent',
+              cursor: 'pointer',
+              transition: 'background 0.15s',
+              '&:hover': { background: 'rgba(255,255,255,0.06)' },
+            }}
+          >
+            <Typography sx={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.55)', fontWeight: 500 }}>
+              {t('nav.change_dest')}
             </Typography>
-            <Typography sx={{ fontSize: '0.54rem', color: 'rgba(255,255,255,0.65)',
-                               textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}>
-              {destination.region}
-            </Typography>
+            <KeyboardArrowDownIcon sx={{ fontSize: 14, color: 'rgba(255,255,255,0.35)' }} />
           </Box>
         </Box>
-
-        {/* Change button */}
-        <Box
-          onClick={(e) => setMenuAnchor(e.currentTarget)}
-          sx={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            px: 1.2, py: 0.65,
-            background: 'transparent',
-            cursor: 'pointer',
-            transition: 'background 0.15s',
-            '&:hover': { background: 'rgba(255,255,255,0.06)' },
-          }}
-        >
-          <Typography sx={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.55)', fontWeight: 500 }}>Cambiar destino</Typography>
-          <KeyboardArrowDownIcon sx={{ fontSize: 14, color: 'rgba(255,255,255,0.35)' }} />
-        </Box>
-        </Box>{/* inner glass card */}
-      </Box>{/* outer glow wrapper */}
+      </Box>
 
       {/* ── Destination dropdown menu ── */}
       <Menu

@@ -4,6 +4,7 @@ import { createTheme } from '@mui/material/styles'
 import { keyframes } from '@emotion/react'
 import { lightTheme } from './theme/lightTheme'
 import { DestinationProvider } from './context/DestinationContext'
+import { LanguageProvider } from './context/LanguageContext'
 import Sidebar from './components/Sidebar'
 import TopBar from './components/TopBar'
 import KPIBar from './components/KPIBar'
@@ -44,6 +45,7 @@ export default function App() {
   return (
     <ThemeProvider theme={lightTheme}>
       <CssBaseline />
+      <LanguageProvider>
       <DestinationProvider>
       <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
 
@@ -148,6 +150,7 @@ export default function App() {
         </Box>
       </Box>
       </DestinationProvider>
+      </LanguageProvider>
     </ThemeProvider>
   )
 }

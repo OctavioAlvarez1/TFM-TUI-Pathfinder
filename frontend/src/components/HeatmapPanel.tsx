@@ -5,6 +5,7 @@ import LayersIcon from '@mui/icons-material/Layers'
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import { useDestination } from '../context/DestinationContext'
+import { useLanguage } from '../context/LanguageContext'
 import { fetchPOIs, fetchCyclePaths, fetchTransitRoutes } from '../api/overpass'
 import type { OverpassPOI, CyclePath, TransitRoute } from '../api/overpass'
 import 'leaflet/dist/leaflet.css'
@@ -14,17 +15,17 @@ type LayerKey = 'alojamientos' | 'recursos' | 'restaurantes' | 'playas'
               | 'transporte' | 'ciclovias' | 'senderos' | 'estaciones_bici'
               | 'accesibilidad' | 'problematicas'
 
-const LAYERS: { key: LayerKey; label: string; icon: string; color: string; defaultOn: boolean }[] = [
-  { key: 'alojamientos',   label: 'Alojamientos',        icon: '🏨', color: '#3B82F6', defaultOn: false },
-  { key: 'recursos',       label: 'Recursos turísticos',  icon: '🏛️', color: '#8B5CF6', defaultOn: true  },
-  { key: 'restaurantes',   label: 'Restaurantes',         icon: '🍽️', color: '#EF4444', defaultOn: true  },
-  { key: 'playas',         label: 'Playas',               icon: '🏖️', color: '#0DD3C5', defaultOn: false },
-  { key: 'transporte',     label: 'Transporte público',   icon: '🚌', color: '#F97316', defaultOn: true  },
-  { key: 'ciclovias',      label: 'Ciclovías',            icon: '〰️', color: '#10B981', defaultOn: true  },
-  { key: 'senderos',       label: 'Senderos',             icon: '🥾', color: '#84CC16', defaultOn: false },
-  { key: 'estaciones_bici',label: 'Estaciones Bici',      icon: '🚲', color: '#06B6D4', defaultOn: true  },
-  { key: 'accesibilidad',  label: 'Accesibilidad',        icon: '♿', color: '#6366F1', defaultOn: true  },
-  { key: 'problematicas',  label: 'Zonas problemáticas',  icon: '⚠️', color: '#F43F5E', defaultOn: false },
+const LAYER_DEFS: { key: LayerKey; labelKey: string; icon: string; color: string; defaultOn: boolean }[] = [
+  { key: 'alojamientos',   labelKey: 'layer.hotels',      icon: '🏨', color: '#3B82F6', defaultOn: false },
+  { key: 'recursos',       labelKey: 'layer.monuments',   icon: '🏛️', color: '#8B5CF6', defaultOn: true  },
+  { key: 'restaurantes',   labelKey: 'layer.restaurants', icon: '🍽️', color: '#EF4444', defaultOn: true  },
+  { key: 'playas',         labelKey: 'layer.beaches',     icon: '🏖️', color: '#0DD3C5', defaultOn: false },
+  { key: 'transporte',     labelKey: 'layer.transport',   icon: '🚌', color: '#F97316', defaultOn: true  },
+  { key: 'ciclovias',      labelKey: 'layer.cycling',     icon: '〰️', color: '#10B981', defaultOn: true  },
+  { key: 'senderos',       labelKey: 'layer.hiking',      icon: '🥾', color: '#84CC16', defaultOn: false },
+  { key: 'estaciones_bici',labelKey: 'layer.bikes',       icon: '🚲', color: '#06B6D4', defaultOn: true  },
+  { key: 'accesibilidad',  labelKey: 'layer.access',      icon: '♿', color: '#6366F1', defaultOn: true  },
+  { key: 'problematicas',  labelKey: 'layer.problems',    icon: '⚠️', color: '#F43F5E', defaultOn: false },
 ]
 
 const TYPE_TO_LAYER: Record<string, LayerKey> = {
@@ -128,9 +129,12 @@ function MapController({ center, zoom }: { center: [number, number]; zoom: numbe
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function HeatmapPanel() {
   const { destination } = useDestination()
+  const { t } = useLanguage()
+
+  const LAYERS = LAYER_DEFS.map(l => ({ ...l, label: t(l.labelKey as Parameters<typeof t>[0]) }))
 
   const [layerOn, setLayerOn] = useState<Record<LayerKey, boolean>>(
-    Object.fromEntries(LAYERS.map(l => [l.key, l.defaultOn])) as Record<LayerKey, boolean>
+    Object.fromEntries(LAYER_DEFS.map(l => [l.key, l.defaultOn])) as Record<LayerKey, boolean>
   )
   const [panelOpen, setPanelOpen]   = useState(true)
   const [selected,  setSelected]    = useState<OverpassPOI | null>(null)
@@ -164,7 +168,8 @@ export default function HeatmapPanel() {
         setLivePOIs(pois)
         setLivePaths(paths)
         setLiveRoutes(routes)
-        if (pois.length === 0) setFetchError('Sin datos OSM para esta zona')
+        // Negative IDs indicate mock/fallback data
+        if (pois.length > 0 && pois[0].id < 0) setFetchError(t('map.mock_data'))
       })
       .finally(() => setLoading(false))
   }, [destination])
@@ -299,7 +304,7 @@ export default function HeatmapPanel() {
           <Typography style={{ fontSize: '0.64rem', color: '#fff', fontWeight: 500 }}>
             {fetchError
               ? fetchError
-              : `${livePOIs.length} POIs · ${liveRoutes.length > 0 ? `${liveRoutes.length} líneas · ` : ''}OpenStreetMap`}
+              : `${livePOIs.length} POIs · ${liveRoutes.length > 0 ? `${liveRoutes.length} lines · ` : ''}${t('map.osm_source')}`}
           </Typography>
         </Box>
       )}
@@ -348,7 +353,7 @@ export default function HeatmapPanel() {
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
               <LayersIcon sx={{ fontSize: 15, color: '#C05928' }} />
               <Typography style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1A3C5E' }}>
-                Capas del mapa
+                {t('layer.panel_title')}
               </Typography>
             </Box>
             <CloseIcon

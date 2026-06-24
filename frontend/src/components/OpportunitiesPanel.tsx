@@ -6,6 +6,7 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward'
 import LightbulbIcon from '@mui/icons-material/Lightbulb'
 import { getDestinationOpportunities } from '../data/mockData'
 import { useDestination } from '../context/DestinationContext'
+import { useLanguage } from '../context/LanguageContext'
 
 const ICONS: Record<string, React.ReactNode> = {
   Alta:  <ErrorIcon        sx={{ fontSize: 16, color: '#EF4444' }} />,
@@ -19,7 +20,12 @@ const BORDER_COLOR: Record<string, string> = {
 
 export default function OpportunitiesPanel({ onNavigate }: { onNavigate?: (view: string) => void }) {
   const { destination } = useDestination()
+  const { t } = useLanguage()
   const opportunities = getDestinationOpportunities(destination.id)
+
+  const priorityLabel: Record<string, string> = {
+    Alta: t('opp.high'), Media: t('opp.medium'), Baja: t('opp.low'),
+  }
 
   return (
     <Box sx={{
@@ -45,7 +51,7 @@ export default function OpportunitiesPanel({ onNavigate }: { onNavigate?: (view:
           <LightbulbIcon sx={{ fontSize: 16, color: '#1A3C5E' }} />
         </Box>
         <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, color: '#1E293B' }}>
-          Zonas con más oportunidades
+          {t('opp.title')}
         </Typography>
       </Box>
 
@@ -72,7 +78,7 @@ export default function OpportunitiesPanel({ onNavigate }: { onNavigate?: (view:
             </Box>
           </Box>
           <Chip
-            label={op.priority}
+            label={priorityLabel[op.priority] ?? op.priority}
             size="small"
             sx={{
               height: 20, fontSize: '0.6rem', fontWeight: 700,
@@ -95,7 +101,7 @@ export default function OpportunitiesPanel({ onNavigate }: { onNavigate?: (view:
           transition: 'background 0.15s',
         }}
       >
-        <Typography sx={{ fontSize: '0.71rem', color: '#1A3C5E', fontWeight: 600 }}>Ver todas las zonas</Typography>
+        <Typography sx={{ fontSize: '0.71rem', color: '#1A3C5E', fontWeight: 600 }}>{t('opp.view_all')}</Typography>
         <ArrowForwardIcon sx={{ fontSize: 13, color: '#1A3C5E' }} />
       </Box>
 

@@ -47,7 +47,7 @@ function sr(seed: number, offset: number, min: number, max: number): number {
   return min + Math.round((x - Math.floor(x)) * (max - min))
 }
 
-export function getDestinationKPIs(destinationId: string): KPI[] {
+export function getDestinationKPIs(destinationId: string, lang: 'es' | 'en' = 'es'): KPI[] {
   const s = hash(destinationId)
   const acc  = sr(s, 0,  65, 96)
   const mob  = sr(s, 1,  52, 91)
@@ -61,13 +61,18 @@ export function getDestinationKPIs(destinationId: string): KPI[] {
   const dCo2  = sr(s, 13, 7, 21)
   const dTime = sr(s, 14, 1, 5)
   const dDest = sr(s, 15, 4, 26)
+  const vsMonth = lang === 'en' ? 'vs last month' : 'vs mes anterior'
+  const newWord  = lang === 'en' ? 'new' : 'nuevos'
+  const labels = lang === 'en'
+    ? ['Accessibility Index', 'Sustainable Mobility', 'Transport Coverage', 'Avoided Emissions', 'Avg. Access Time', 'Accessible Destinations']
+    : ['Índice de Accesibilidad', 'Movilidad Sostenible', 'Cobertura Transporte', 'Emisiones Evitadas', 'Tiempo Medio de Acceso', 'Destinos Accesibles']
   return [
-    { label: 'Índice de Accesibilidad', value: String(acc),  unit: '/100',   delta: `+${dAcc}% vs mes anterior`,     icon: '♿', color: '#1A3C5E' },
-    { label: 'Movilidad Sostenible',    value: String(mob),  unit: '/100',   delta: `+${dMob}% vs mes anterior`,     icon: '🌱', color: '#2D6A4F' },
-    { label: 'Cobertura Transporte',    value: String(trn),  unit: '%',      delta: `+${dTrn}% vs mes anterior`,     icon: '🚌', color: '#7B5E3A' },
-    { label: 'Emisiones Evitadas',      value: String(co2),  unit: 't CO₂',  delta: `+${dCo2}% vs mes anterior`,     icon: '💚', color: '#2E7D98' },
-    { label: 'Tiempo Medio de Acceso',  value: String(time), unit: 'min',    delta: `−${dTime} min vs mes anterior`, icon: '⏱', color: '#C05928' },
-    { label: 'Destinos Accesibles',     value: String(dest), unit: '',       delta: `+${dDest} nuevos`,               icon: '📍', color: '#8B2232' },
+    { label: labels[0], value: String(acc),  unit: '/100',   delta: `+${dAcc}% ${vsMonth}`,     icon: '♿', color: '#1A3C5E' },
+    { label: labels[1], value: String(mob),  unit: '/100',   delta: `+${dMob}% ${vsMonth}`,     icon: '🌱', color: '#2D6A4F' },
+    { label: labels[2], value: String(trn),  unit: '%',      delta: `+${dTrn}% ${vsMonth}`,     icon: '🚌', color: '#7B5E3A' },
+    { label: labels[3], value: String(co2),  unit: 't CO₂',  delta: `+${dCo2}% ${vsMonth}`,     icon: '💚', color: '#2E7D98' },
+    { label: labels[4], value: String(time), unit: 'min',    delta: `−${dTime} min ${vsMonth}`, icon: '⏱', color: '#C05928' },
+    { label: labels[5], value: String(dest), unit: '',       delta: `+${dDest} ${newWord}`,      icon: '📍', color: '#8B2232' },
   ]
 }
 

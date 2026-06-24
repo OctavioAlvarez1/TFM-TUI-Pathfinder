@@ -9,7 +9,7 @@ A suite of 5 AI and data projects for the TUI Care Foundation Future Shapers Spa
 | TUI-Smart-Destination-Recommender | 2 | **Horizon** | AI destination recommender (travellers) | FastAPI + React 19 + MUI v9 | 8000 / 5173 |
 | TUI-Atlas | 3 | **Atlas** | Geospatial congestion & sustainability dashboard | Streamlit + Folium + Plotly | 8501 |
 | TUI-Sentinel | 1 | **Sentinel** | Sentiment & reputation monitoring | Streamlit + Plotly | 8502 |
-| TUI-Pathfinder | 4 | **Pathfinder** | Sustainable mobility & accessibility | Streamlit + Folium + Plotly | 8503 |
+| TUI-Pathfinder | 4 | **Pathfinder** | Sustainable mobility & accessibility | React + Vite + TypeScript | 5174 |
 | TUI-Sage | 5 | **Sage** | RAG-powered destination AI advisor | Streamlit + Claude API + ChromaDB | 8504 |
 
 ## How They Connect
@@ -128,7 +128,7 @@ Desktop/
 ├── TUI-Smart-Destination-Recommender/   ← Reto 2 (primary data + API + React UI)
 ├── TUI-Atlas/                            ← Reto 3 (port 8501)
 ├── TUI-Sentinel/                         ← Reto 1 (port 8502)
-├── TUI-Pathfinder/                       ← Reto 4 (port 8503)
+├── TUI-Pathfinder/                       ← Reto 4 (port 5174)
 └── TUI-Sage/                             ← Reto 5 (port 8504)
 ```
 
@@ -150,7 +150,7 @@ cd TUI-Atlas && streamlit run app.py --server.port 8501
 cd TUI-Sentinel && streamlit run app.py --server.port 8502
 
 # Terminal 5 — Pathfinder (mobility dashboard)
-cd TUI-Pathfinder && streamlit run app.py --server.port 8503
+cd TUI-Pathfinder/frontend && npm run dev    # http://localhost:5174
 
 # Terminal 6 — Sage (RAG AI advisor, requires ANTHROPIC_API_KEY)
 cd TUI-Sage && streamlit run app.py --server.port 8504

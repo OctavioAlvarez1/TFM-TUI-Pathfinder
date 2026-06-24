@@ -3,10 +3,20 @@ import DirectionsBikeIcon from '@mui/icons-material/DirectionsBike'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import { getDestinationModal } from '../data/mockData'
 import { useDestination } from '../context/DestinationContext'
+import { useLanguage } from '../context/LanguageContext'
 
 export default function ModalDonut() {
   const { destination } = useDestination()
-  const { entries: modalData, total } = getDestinationModal(destination.id)
+  const { t } = useLanguage()
+  const { entries: rawEntries, total } = getDestinationModal(destination.id)
+
+  const nameMap: Record<string, string> = {
+    'A pie': t('donut.walking'),
+    'Bicicleta': t('donut.bike'),
+    'Bus/Metro': t('donut.bus'),
+    'Vehículo privado': t('donut.car'),
+  }
+  const modalData = rawEntries.map(e => ({ ...e, name: nameMap[e.name] ?? e.name }))
   return (
     <Box sx={{
       background: '#FFFFFF',
@@ -29,7 +39,7 @@ export default function ModalDonut() {
           <DirectionsBikeIcon sx={{ fontSize: 15, color: '#2D6A4F' }} />
         </Box>
         <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, color: '#1E293B' }}>
-          Distribución modal
+          {t('donut.title')}
         </Typography>
       </Box>
 
@@ -62,7 +72,7 @@ export default function ModalDonut() {
           </PieChart>
         </ResponsiveContainer>
         <Box sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', textAlign: 'center' }}>
-          <Typography sx={{ fontSize: '0.52rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>VIAJES</Typography>
+          <Typography sx={{ fontSize: '0.52rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('donut.trips_label')}</Typography>
           <Typography sx={{ fontSize: '0.85rem', fontWeight: 800, color: '#0F172A', lineHeight: 1 }}>{total.toLocaleString('es-ES')}</Typography>
         </Box>
       </Box>

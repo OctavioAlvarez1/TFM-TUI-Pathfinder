@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Box, Typography } from '@mui/material'
 import { useDestination } from '../context/DestinationContext'
+import { useLanguage } from '../context/LanguageContext'
 
 function mkRng(seed: string) {
   let s = [...seed].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) | 0, 1)
@@ -78,6 +79,7 @@ function KPICard({
 
 export default function AccessibilityView() {
   const { destination } = useDestination()
+  const { t } = useLanguage()
 
   const data = useMemo(() => {
     const rng = mkRng(destination.id + 'acc')
@@ -87,21 +89,21 @@ export default function AccessibilityView() {
     const walkCoverage = Math.round(35 + rng() * 57)
 
     const categories: CategoryData[] = [
-      { emoji: '🏨', label: 'Alojamientos', pct: Math.round(60 + rng() * 35) },
-      { emoji: '🏛️', label: 'Monumentos', pct: Math.round(40 + rng() * 40) },
-      { emoji: '🍽️', label: 'Restaurantes', pct: Math.round(50 + rng() * 35) },
-      { emoji: '🏖️', label: 'Playas', pct: Math.round(30 + rng() * 40) },
-      { emoji: '🚌', label: 'Transporte', pct: Math.round(55 + rng() * 35) },
-      { emoji: '🚲', label: 'Estaciones bici', pct: Math.round(70 + rng() * 28) },
+      { emoji: '🏨', label: 'hotels',      pct: Math.round(60 + rng() * 35) },
+      { emoji: '🏛️', label: 'monuments',  pct: Math.round(40 + rng() * 40) },
+      { emoji: '🍽️', label: 'restaurants',pct: Math.round(50 + rng() * 35) },
+      { emoji: '🏖️', label: 'beaches',    pct: Math.round(30 + rng() * 40) },
+      { emoji: '🚌', label: 'transport',   pct: Math.round(55 + rng() * 35) },
+      { emoji: '🚲', label: 'bikes',       pct: Math.round(70 + rng() * 28) },
     ]
     const avgPct = Math.round(categories.reduce((s, c) => s + c.pct, 0) / categories.length)
 
     const rawBarriers: BarrierData[] = [
-      { label: 'Escalones sin rampa', count: Math.round(3 + rng() * 9) },
-      { label: 'Aceras estrechas', count: Math.round(5 + rng() * 13) },
-      { label: 'Señalización insuficiente', count: Math.round(2 + rng() * 7) },
-      { label: 'Falta ascensores', count: Math.round(1 + rng() * 5) },
-      { label: 'Iluminación deficiente', count: Math.round(2 + rng() * 8) },
+      { label: 'steps',     count: Math.round(3 + rng() * 9) },
+      { label: 'narrow',    count: Math.round(5 + rng() * 13) },
+      { label: 'signage',   count: Math.round(2 + rng() * 7) },
+      { label: 'elevators', count: Math.round(1 + rng() * 5) },
+      { label: 'lighting',  count: Math.round(2 + rng() * 8) },
     ]
 
     const kpi: KPIData = { accessIndex, accessiblePOIs, barriers, walkCoverage }
@@ -132,7 +134,7 @@ export default function AccessibilityView() {
               fontSize: '0.63rem', color: '#94A3B8', lineHeight: 1,
               textTransform: 'uppercase', letterSpacing: '0.06em',
             }}>
-              Accesibilidad
+              {t('acc.header')}
             </Typography>
             <Typography sx={{ fontSize: '0.86rem', fontWeight: 700, color: '#1A3C5E' }}>
               {destination.name}
@@ -147,35 +149,35 @@ export default function AccessibilityView() {
         {/* KPI row */}
         <Box sx={{ display: 'flex', gap: 1.5, flexShrink: 0 }}>
           <KPICard
-            label="Índice accesibilidad"
+            label={t('acc.kpi.index')}
             value={data.kpi.accessIndex}
             unit="/100"
             color="#2D6A4F"
-            delta={`↑ ${Math.round(data.kpi.accessIndex * 0.04)} vs mes anterior`}
+            delta={`↑ ${Math.round(data.kpi.accessIndex * 0.04)} ${t('acc.vs_month')}`}
             deltaPositive
           />
           <KPICard
-            label="POIs accesibles"
+            label={t('acc.kpi.pois')}
             value={data.kpi.accessiblePOIs}
             unit=""
             color="#2E7D98"
-            delta="↑ 8 nuevos este mes"
+            delta={t('acc.kpi.delta.new_pois')}
             deltaPositive
           />
           <KPICard
-            label="Barreras detectadas"
+            label={t('acc.kpi.barriers')}
             value={data.kpi.barriers}
             unit=""
             color="#EF4444"
-            delta="↓ 3 vs mes anterior"
+            delta={t('acc.kpi.delta.barriers')}
             deltaPositive={false}
           />
           <KPICard
-            label="Cobertura peatonal"
+            label={t('acc.kpi.walk')}
             value={data.kpi.walkCoverage}
             unit="%"
             color="#1A3C5E"
-            delta={`↑ ${Math.round(data.kpi.walkCoverage * 0.03)}% vs mes anterior`}
+            delta={`↑ ${Math.round(data.kpi.walkCoverage * 0.03)}% ${t('acc.vs_month')}`}
             deltaPositive
           />
         </Box>
@@ -193,12 +195,17 @@ export default function AccessibilityView() {
               fontSize: '0.63rem', color: '#94A3B8', textTransform: 'uppercase',
               letterSpacing: '0.08em', fontWeight: 600,
             }}>
-              Distribución por categoría
+              {t('acc.section.categories')}
             </Typography>
 
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.1 }}>
               {data.categories.map((cat, i) => {
                 const color = barColor(cat.pct)
+                const catLabelMap: Record<string, string> = {
+                  hotels: t('acc.cat.hotels'), monuments: t('acc.cat.monuments'),
+                  restaurants: t('acc.cat.restaurants'), beaches: t('acc.cat.beaches'),
+                  transport: t('acc.cat.transport'), bikes: t('acc.cat.bikes'),
+                }
                 return (
                   <Box
                     key={cat.label}
@@ -208,7 +215,7 @@ export default function AccessibilityView() {
                   >
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.4 }}>
                       <Typography sx={{ fontSize: '0.72rem', color: '#475569' }}>
-                        {cat.emoji} {cat.label}
+                        {cat.emoji} {catLabelMap[cat.label] ?? cat.label}
                       </Typography>
                       <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color }}>
                         {cat.pct}%
@@ -240,7 +247,7 @@ export default function AccessibilityView() {
             }}>
               <Box sx={{ width: 10, height: 10, borderRadius: '50%', background: '#1A3C5E', flexShrink: 0 }} />
               <Typography sx={{ fontSize: '0.72rem', color: '#64748B' }}>
-                Media del destino:{' '}
+                {t('acc.avg')}{' '}
                 <span style={{ fontWeight: 700, color: '#1A3C5E' }}>{data.avgPct}%</span>
               </Typography>
             </Box>
@@ -256,7 +263,7 @@ export default function AccessibilityView() {
               fontSize: '0.63rem', color: '#94A3B8', textTransform: 'uppercase',
               letterSpacing: '0.08em', fontWeight: 600,
             }}>
-              Tipos de barreras detectadas
+              {t('acc.section.barriers')}
             </Typography>
 
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -264,6 +271,11 @@ export default function AccessibilityView() {
                 const color = barrierSeverityColor(i, sortedBarriers.length)
                 const maxCount = 18
                 const fillPct = Math.min(100, (b.count / maxCount) * 100)
+                const barrierLabelMap: Record<string, string> = {
+                  steps: t('acc.barrier.steps'), narrow: t('acc.barrier.narrow'),
+                  signage: t('acc.barrier.signage'), elevators: t('acc.barrier.elevators'),
+                  lighting: t('acc.barrier.lighting'),
+                }
                 return (
                   <Box key={b.label}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.4 }}>
@@ -277,7 +289,7 @@ export default function AccessibilityView() {
                         </Typography>
                       </Box>
                       <Typography sx={{ fontSize: '0.72rem', color: '#475569', flex: 1 }}>
-                        {b.label}
+                        {barrierLabelMap[b.label] ?? b.label}
                       </Typography>
                     </Box>
                     <Box sx={{ height: 7, borderRadius: 4, background: `${color}25`, overflow: 'hidden' }}>
@@ -298,13 +310,13 @@ export default function AccessibilityView() {
                 fontSize: '0.63rem', color: '#94A3B8', textTransform: 'uppercase',
                 letterSpacing: '0.08em', fontWeight: 600, mb: 1,
               }}>
-                Recomendaciones prioritarias
+                {t('acc.section.recs')}
               </Typography>
 
               {[
-                { text: 'Instalar rampas en 5 accesos clave', dot: '#EF4444', badge: 'Alta prioridad', badgeBg: '#EF444415', badgeColor: '#EF4444' },
-                { text: 'Ampliar aceras zona comercial', dot: '#F59E0B', badge: 'Media prioridad', badgeBg: '#F59E0B15', badgeColor: '#F59E0B' },
-                { text: 'Mejorar señalética inclusiva', dot: '#2D6A4F', badge: 'En progreso', badgeBg: '#2D6A4F15', badgeColor: '#2D6A4F' },
+                { text: t('acc.rec.ramps'),    dot: '#EF4444', badge: t('acc.badge.high'),     badgeBg: '#EF444415', badgeColor: '#EF4444' },
+                { text: t('acc.rec.sidewalks'),dot: '#F59E0B', badge: t('acc.badge.med'),      badgeBg: '#F59E0B15', badgeColor: '#F59E0B' },
+                { text: t('acc.rec.signage'),  dot: '#2D6A4F', badge: t('acc.badge.progress'), badgeBg: '#2D6A4F15', badgeColor: '#2D6A4F' },
               ].map((rec) => (
                 <Box key={rec.text} sx={{
                   display: 'flex', alignItems: 'center', gap: 1,

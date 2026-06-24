@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import { Box, Typography } from '@mui/material'
 import { useDestination } from '../context/DestinationContext'
+import { useLanguage } from '../context/LanguageContext'
 import { fetchPernoctaciones } from '../api/ine'
 import type { INEObs } from '../api/ine'
 
@@ -9,20 +10,11 @@ function mkRng(seed: string) {
   return () => { s = (Math.imul(s, 1664525) + 1013904223) | 0; return (s >>> 0) / 4294967296 }
 }
 
-type TimeRange = '6 meses' | '12 meses' | '24 meses'
-
-const TIME_RANGES: TimeRange[] = ['6 meses', '12 meses', '24 meses']
-const TIME_RANGE_N: Record<TimeRange, number> = { '6 meses': 6, '12 meses': 12, '24 meses': 24 }
-
-const MONTH_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+type TimeRangeKey = '6m' | '12m' | '24m'
+const TIME_RANGE_KEYS: TimeRangeKey[] = ['6m', '12m', '24m']
+const TIME_RANGE_N: Record<TimeRangeKey, number> = { '6m': 6, '12m': 12, '24m': 24 }
 
 const PEER_DESTINATIONS = ['Barcelona', 'Sevilla', 'Málaga', 'Valencia', 'Bilbao', 'Granada', 'San Sebastián']
-
-const TREND_BULLETS = [
-  'La movilidad sostenible creció un 18% en el último trimestre',
-  'Las zonas periféricas registran mayor accesibilidad que la media nacional',
-  'El transporte público representó el 34% de los desplazamientos turísticos',
-]
 
 function fmtPernocta(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
@@ -72,7 +64,8 @@ function KPICard({
 
 export default function AnalyticsView() {
   const { destination } = useDestination()
-  const [timeRange, setTimeRange]     = useState<TimeRange>('12 meses')
+  const { t } = useLanguage()
+  const [timeRange, setTimeRange]     = useState<TimeRangeKey>('12m')
   const [ineData,   setIneData]       = useState<INEObs[]>([])
   const [ineLoading, setIneLoading]   = useState(false)
 
@@ -84,6 +77,8 @@ export default function AnalyticsView() {
       .finally(() => setIneLoading(false))
   }, [destination.id])
 
+  const MONTH_LABELS = useMemo(() => t('analytics.months').split(','), [t])
+
   const synth = useMemo(() => {
     const rng = mkRng(destination.id + 'analytics')
 
@@ -94,7 +89,7 @@ export default function AnalyticsView() {
 
     const SUMMER = [6, 7]
     const WINTER = [0, 1, 11]
-    const months = MONTH_LABELS.map((_, i) => {
+    const months = Array.from({ length: 12 }, (_, i) => {
       if (SUMMER.includes(i)) return Math.round(85 + rng() * 15)
       if (WINTER.includes(i)) return Math.round(40 + rng() * 20)
       return Math.round(55 + rng() * 35)
@@ -114,16 +109,16 @@ export default function AnalyticsView() {
 
   // KPI — real when available
   const kpiPernocta = useMemo(() => {
-    if (!hasRealData) return { value: synth.visitors.toLocaleString(), delta: '↑ 12% vs año anterior' }
+    if (!hasRealData) return { value: synth.visitors.toLocaleString(), delta: `↑ 12% ${t('analytics.vs_year')}` }
     const last = ineData[ineData.length - 1]
     const prevYear = ineData.find(o => o.year === last.year - 1 && o.month === last.month)
     const delta = prevYear
       ? `${last.pernoctaciones >= prevYear.pernoctaciones ? '↑' : '↓'} ${
           Math.abs(Math.round((last.pernoctaciones - prevYear.pernoctaciones) / prevYear.pernoctaciones * 100))
-        }% vs año anterior`
+        }% ${t('analytics.vs_year')}`
       : undefined
     return { value: fmtPernocta(last.pernoctaciones), delta }
-  }, [hasRealData, ineData, synth.visitors])
+  }, [hasRealData, ineData, synth.visitors, t])
 
   // Bar chart data — real months or synthetic fallback
   interface BarObs { label: string; value: number; year?: number }
@@ -139,11 +134,11 @@ export default function AnalyticsView() {
       }))
     }
 
-    if (timeRange === '6 meses') {
+    if (timeRange === '6m') {
       return MONTH_LABELS.slice(6).map((label, i) => ({ label, value: synth.months[6 + i] }))
     }
     return MONTH_LABELS.map((label, i) => ({ label, value: synth.months[i] }))
-  }, [timeRange, hasRealData, ineData, synth.months])
+  }, [timeRange, hasRealData, ineData, synth.months, MONTH_LABELS])
 
   const maxBarVal = Math.max(...visibleBars.map(b => b.value), 1)
 
@@ -170,7 +165,7 @@ export default function AnalyticsView() {
               fontSize: '0.63rem', color: '#94A3B8', lineHeight: 1,
               textTransform: 'uppercase', letterSpacing: '0.06em',
             }}>
-              Análisis
+              {t('analytics.header')}
             </Typography>
             <Typography sx={{ fontSize: '0.86rem', fontWeight: 700, color: '#1A3C5E' }}>
               {destination.name}
@@ -179,12 +174,13 @@ export default function AnalyticsView() {
         </Box>
 
         <Box sx={{ display: 'flex', gap: 0.75 }}>
-          {TIME_RANGES.map((range) => {
-            const active = timeRange === range
+          {TIME_RANGE_KEYS.map((key) => {
+            const active = timeRange === key
+            const rangeKey = `analytics.range.${key}` as Parameters<typeof t>[0]
             return (
               <Box
-                key={range}
-                onClick={() => setTimeRange(range)}
+                key={key}
+                onClick={() => setTimeRange(key)}
                 sx={{
                   px: 1.4, py: 0.5, borderRadius: '20px', cursor: 'pointer',
                   background: active ? '#1A3C5E' : 'transparent',
@@ -194,7 +190,7 @@ export default function AnalyticsView() {
                 }}
               >
                 <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: active ? '#fff' : '#64748B' }}>
-                  {range}
+                  {t(rangeKey)}
                 </Typography>
               </Box>
             )
@@ -208,29 +204,29 @@ export default function AnalyticsView() {
         {/* KPI row */}
         <Box sx={{ display: 'flex', gap: 1.5, flexShrink: 0 }}>
           <KPICard
-            label={hasRealData ? 'Pernoctaciones (último mes)' : 'Visitantes mes'}
+            label={hasRealData ? t('analytics.kpi.pernoctaciones') : t('analytics.kpi.visits')}
             value={kpiPernocta.value}
             color="#1A3C5E"
             delta={kpiPernocta.delta}
           />
           <KPICard
-            label="Flujo sostenible"
+            label={t('analytics.kpi.sustainable')}
             value={`${synth.sustainable}`}
             unit="%"
             color="#2D6A4F"
-            delta="↑ 8 pp vs año anterior"
+            delta={t('analytics.kpi.sus_delta')}
           />
           <KPICard
-            label="Índice satisfacción"
+            label={t('analytics.kpi.satisfaction')}
             value={synth.satisfaction.toFixed(1)}
             unit="/10"
             color="#2E7D98"
           />
           <KPICard
-            label="Incidencias"
+            label={t('analytics.kpi.incidents')}
             value={`${synth.incidents}`}
             color="#EF4444"
-            delta="↓ 3 vs periodo anterior"
+            delta={t('analytics.kpi.inc_delta')}
           />
         </Box>
 
@@ -248,10 +244,10 @@ export default function AnalyticsView() {
                 fontSize: '0.63rem', color: '#94A3B8', textTransform: 'uppercase',
                 letterSpacing: '0.08em', fontWeight: 600,
               }}>
-                {hasRealData ? 'Pernoctaciones hoteleras · INE · EOH' : 'Evolución mensual de visitantes'}
+                {hasRealData ? t('analytics.chart.ine') : t('analytics.chart.monthly')}
               </Typography>
               {ineLoading && (
-                <Typography sx={{ fontSize: '0.6rem', color: '#CBD5E1' }}>cargando INE…</Typography>
+                <Typography sx={{ fontSize: '0.6rem', color: '#CBD5E1' }}>{t('analytics.chart.loading')}</Typography>
               )}
               {hasRealData && !ineLoading && (
                 <Box sx={{
@@ -259,7 +255,7 @@ export default function AnalyticsView() {
                   background: 'rgba(45,106,79,0.1)', border: '1px solid rgba(45,106,79,0.25)',
                 }}>
                   <Typography sx={{ fontSize: '0.58rem', color: '#2D6A4F', fontWeight: 700 }}>
-                    Datos reales
+                    {t('analytics.chart.real_data')}
                   </Typography>
                 </Box>
               )}
@@ -321,7 +317,7 @@ export default function AnalyticsView() {
               fontSize: '0.63rem', color: '#94A3B8', textTransform: 'uppercase',
               letterSpacing: '0.08em', fontWeight: 600,
             }}>
-              Comparativa con destinos similares
+              {t('analytics.chart.peers')}
             </Typography>
 
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.1 }}>
@@ -360,20 +356,23 @@ export default function AnalyticsView() {
                 fontSize: '0.63rem', color: '#94A3B8', textTransform: 'uppercase',
                 letterSpacing: '0.08em', fontWeight: 600, mb: 1,
               }}>
-                Tendencias clave
+                {t('analytics.chart.trends')}
               </Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
-                {TREND_BULLETS.map((bullet) => (
-                  <Box key={bullet} sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
-                    <Box sx={{
-                      width: 6, height: 6, borderRadius: '50%',
-                      background: '#2E7D98', flexShrink: 0, mt: 0.55,
-                    }} />
-                    <Typography sx={{ fontSize: '0.71rem', color: '#475569', lineHeight: 1.5 }}>
-                      {bullet}
-                    </Typography>
-                  </Box>
-                ))}
+                {([1, 2, 3] as const).map((n) => {
+                  const bullet = t(`analytics.trend.${n}` as Parameters<typeof t>[0])
+                  return (
+                    <Box key={n} sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+                      <Box sx={{
+                        width: 6, height: 6, borderRadius: '50%',
+                        background: '#2E7D98', flexShrink: 0, mt: 0.55,
+                      }} />
+                      <Typography sx={{ fontSize: '0.71rem', color: '#475569', lineHeight: 1.5 }}>
+                        {bullet}
+                      </Typography>
+                    </Box>
+                  )
+                })}
               </Box>
             </Box>
           </Box>

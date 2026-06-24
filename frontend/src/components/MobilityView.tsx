@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Box, Typography, LinearProgress, Slider } from '@mui/material'
 import { useDestination } from '../context/DestinationContext'
+import { useLanguage } from '../context/LanguageContext'
 
 function mkRng(seed: string) {
   let s = [...seed].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) | 0, 1)
@@ -61,15 +62,17 @@ function KPICard({
 }
 
 const CO2_PER_KM: Record<string, number> = { car: 170, bus: 68, bike: 0, walk: 0 }
-const CALC_MODES = [
-  { id: 'car',   emoji: '🚗', label: 'Coche',   color: '#EF4444' },
-  { id: 'bus',   emoji: '🚌', label: 'Bus',     color: '#F59E0B' },
-  { id: 'bike',  emoji: '🚲', label: 'Bici',    color: '#2E7D98' },
-  { id: 'walk',  emoji: '🚶', label: 'A pie',   color: '#2D6A4F' },
-]
 
 export default function MobilityView() {
   const { destination } = useDestination()
+  const { t } = useLanguage()
+
+  const CALC_MODES = [
+    { id: 'car',   emoji: '🚗', label: t('mob.calc.car'),  color: '#EF4444' },
+    { id: 'bus',   emoji: '🚌', label: t('mob.calc.bus'),  color: '#F59E0B' },
+    { id: 'bike',  emoji: '🚲', label: t('mob.calc.bike'), color: '#2E7D98' },
+    { id: 'walk',  emoji: '🚶', label: t('mob.calc.walk'), color: '#2D6A4F' },
+  ]
 
   const data = useMemo(() => {
     const rng = mkRng(destination.id + 'mob')
@@ -151,7 +154,7 @@ export default function MobilityView() {
               fontSize: '0.63rem', color: '#94A3B8', lineHeight: 1,
               textTransform: 'uppercase', letterSpacing: '0.06em',
             }}>
-              Movilidad Sostenible
+              {t('mob.header')}
             </Typography>
             <Typography sx={{ fontSize: '0.86rem', fontWeight: 700, color: '#1A3C5E' }}>
               {destination.name}
@@ -166,41 +169,41 @@ export default function MobilityView() {
         {/* KPI row */}
         <Box sx={{ display: 'flex', gap: 1.5, flexShrink: 0 }}>
           <KPICard
-            label="Red ciclista"
+            label={t('mob.kpi.cycle')}
             value={data.kpi.cycleNetwork}
             unit="km"
             color="#2D6A4F"
-            delta="↑ 4 km nuevos este mes"
+            delta={t('mob.kpi.delta.cycle')}
             deltaPositive
           />
           <KPICard
-            label="Estaciones bici"
+            label={t('mob.kpi.stations')}
             value={data.kpi.bikeStations}
             unit=""
             color="#2E7D98"
-            delta="↑ 2 estaciones nuevas"
+            delta={t('mob.kpi.delta.stations')}
             deltaPositive
           />
           <KPICard
-            label="Emisiones evitadas"
+            label={t('mob.kpi.emissions')}
             value={data.kpi.emissionsAvoided}
             unit="t CO₂"
             color="#10B981"
-            delta="↑ 12% vs mes anterior"
+            delta={t('mob.kpi.delta.emissions')}
             deltaPositive
           />
           <KPICard
-            label="Cobertura transporte"
+            label={t('mob.kpi.transit')}
             value={data.kpi.transitCoverage}
             unit="%"
             color="#1A3C5E"
-            delta={`↑ ${Math.max(1, Math.round(data.kpi.transitCoverage * 0.03))}% vs año anterior`}
+            delta={`↑ ${Math.max(1, Math.round(data.kpi.transitCoverage * 0.03))}% ${t('mob.vs_year')}`}
             deltaPositive
           />
         </Box>
 
         {/* Two-column content */}
-        <Box sx={{ display: 'flex', gap: 2, flex: 1, minHeight: 0 }}>
+        <Box sx={{ display: 'flex', gap: 2, flexShrink: 0, minHeight: 300 }}>
 
           {/* LEFT — Modal split donut */}
           <Box sx={{
@@ -212,7 +215,7 @@ export default function MobilityView() {
               fontSize: '0.63rem', color: '#94A3B8', textTransform: 'uppercase',
               letterSpacing: '0.08em', fontWeight: 600,
             }}>
-              Reparto modal de viajes
+              {t('mob.section.modal')}
             </Typography>
 
             {/* Donut */}
@@ -233,7 +236,7 @@ export default function MobilityView() {
                   alignItems: 'center', justifyContent: 'center',
                 }}>
                   <Typography sx={{ fontSize: '0.58rem', color: '#94A3B8', textAlign: 'center', lineHeight: 1.3 }}>
-                    Movilidad{'\n'}sostenible
+                    {t('mob.donut.center').split('\n').map((line, i) => <span key={i}>{line}{i === 0 ? <br /> : null}</span>)}
                   </Typography>
                   <Typography sx={{ fontSize: '1rem', fontWeight: 800, color: '#1A3C5E', lineHeight: 1 }}>
                     {data.modal.walk + data.modal.bike + data.modal.transit}%
@@ -245,10 +248,10 @@ export default function MobilityView() {
             {/* Legend */}
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.7 }}>
               {[
-                { emoji: '🚶', label: 'A pie', pct: data.modal.walk, color: '#2D6A4F', change: '+3%', up: true },
-                { emoji: '🚲', label: 'Bicicleta', pct: data.modal.bike, color: '#2E7D98', change: '+5%', up: true },
-                { emoji: '🚌', label: 'Transporte público', pct: data.modal.transit, color: '#1A3C5E', change: '+2%', up: true },
-                { emoji: '🚗', label: 'Vehículo privado', pct: data.modal.car, color: '#EF4444', change: '-4%', up: false },
+                { emoji: '🚶', label: t('mob.legend.walk'),    pct: data.modal.walk,    color: '#2D6A4F', change: '+3%', up: true },
+                { emoji: '🚲', label: t('mob.legend.bike'),    pct: data.modal.bike,    color: '#2E7D98', change: '+5%', up: true },
+                { emoji: '🚌', label: t('mob.legend.transit'), pct: data.modal.transit, color: '#1A3C5E', change: '+2%', up: true },
+                { emoji: '🚗', label: t('mob.legend.car'),     pct: data.modal.car,     color: '#EF4444', change: '-4%', up: false },
               ].map((mode) => (
                 <Box key={mode.label} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <Box sx={{ width: 10, height: 10, borderRadius: '50%', background: mode.color, flexShrink: 0 }} />
@@ -276,15 +279,15 @@ export default function MobilityView() {
               fontSize: '0.63rem', color: '#94A3B8', textTransform: 'uppercase',
               letterSpacing: '0.08em', fontWeight: 600,
             }}>
-              CO₂ emitido por modo (g/viaje)
+              {t('mob.section.co2')}
             </Typography>
 
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.2 }}>
               {[
-                { emoji: '🚗', label: 'Vehículo privado', value: data.carEmissions, color: '#EF4444' },
-                { emoji: '🚌', label: 'Bus eléctrico', value: data.busEmissions, color: '#F59E0B' },
-                { emoji: '🚲', label: 'Bicicleta', value: 0, color: '#2D6A4F' },
-                { emoji: '🚶', label: 'A pie', value: 0, color: '#2D6A4F' },
+                { emoji: '🚗', label: t('mob.mode.car'),  value: data.carEmissions, color: '#EF4444' },
+                { emoji: '🚌', label: t('mob.mode.bus'),  value: data.busEmissions, color: '#F59E0B' },
+                { emoji: '🚲', label: t('mob.mode.bike'), value: 0, color: '#2D6A4F' },
+                { emoji: '🚶', label: t('mob.mode.walk'), value: 0, color: '#2D6A4F' },
               ].map((mode) => (
                 <Box key={mode.label}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.4 }}>
@@ -313,24 +316,24 @@ export default function MobilityView() {
               background: '#F0FBF6', border: '1px solid #2D6A4F30',
             }}>
               <Typography sx={{ fontSize: '0.7rem', color: '#2D6A4F', fontWeight: 600 }}>
-                Reducción del 8% en emisiones totales ↓
+                {t('mob.emission.reduction')}
               </Typography>
               <Typography sx={{ fontSize: '0.65rem', color: '#64748B' }}>
-                Comparativa vs año anterior
+                {t('mob.emission.vs_year')}
               </Typography>
             </Box>
 
             {/* 2026 Target */}
-            <Box sx={{ mt: 'auto', pt: 1.5, borderTop: '1px solid #EDE8E3' }}>
+            <Box sx={{ mt: 1, pt: 1.5, borderTop: '1px solid #EDE8E3' }}>
               <Typography sx={{
                 fontSize: '0.63rem', color: '#94A3B8', textTransform: 'uppercase',
                 letterSpacing: '0.08em', fontWeight: 600, mb: 1,
               }}>
-                Objetivo 2026
+                {t('mob.objective.title')}
               </Typography>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.6 }}>
                 <Typography sx={{ fontSize: '0.72rem', color: '#475569' }}>
-                  Cuota bicicleta: {data.bikeCurrentPct}% / meta {data.bikeTarget}%
+                  {t('mob.objective.quota')} {data.bikeCurrentPct}% {t('mob.objective.meta')} {data.bikeTarget}%
                 </Typography>
                 {data.targetMet ? (
                   <Box sx={{
@@ -338,7 +341,7 @@ export default function MobilityView() {
                     background: '#2D6A4F15', border: '1px solid #2D6A4F40',
                   }}>
                     <Typography sx={{ fontSize: '0.62rem', fontWeight: 700, color: '#2D6A4F' }}>
-                      Meta alcanzada ✓
+                      {t('mob.objective.achieved')}
                     </Typography>
                   </Box>
                 ) : (
@@ -347,7 +350,7 @@ export default function MobilityView() {
                     background: '#2E7D9815', border: '1px solid #2E7D9840',
                   }}>
                     <Typography sx={{ fontSize: '0.62rem', fontWeight: 700, color: '#2E7D98' }}>
-                      En camino
+                      {t('mob.objective.on_track')}
                     </Typography>
                   </Box>
                 )}
@@ -382,10 +385,10 @@ export default function MobilityView() {
               fontSize: '0.63rem', color: '#94A3B8', textTransform: 'uppercase',
               letterSpacing: '0.08em', fontWeight: 600,
             }}>
-              Calcula tu huella de carbono
+              {t('mob.calc.title')}
             </Typography>
             <Typography sx={{ fontSize: '0.68rem', color: '#475569' }}>
-              Distancia: <strong>{calcDist} km</strong>
+              {t('mob.calc.dist')} <strong>{calcDist} km</strong>
             </Typography>
           </Box>
 
@@ -447,15 +450,15 @@ export default function MobilityView() {
               }}>
                 {fmtG(calcCO2)}
               </Typography>
-              <Typography sx={{ fontSize: '0.6rem', color: '#94A3B8', mb: 0.25 }}>CO₂ por viaje</Typography>
+              <Typography sx={{ fontSize: '0.6rem', color: '#94A3B8', mb: 0.25 }}>{t('mob.calc.co2_trip')}</Typography>
               {calcMode !== 'car' && (
                 <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, color: '#2D6A4F' }}>
-                  ↓ {savingPct}% vs coche ({fmtG(savingG)} ahorrado)
+                  ↓ {savingPct}% {t('mob.calc.vs_car')} ({fmtG(savingG)} {t('mob.calc.saved')})
                 </Typography>
               )}
               {calcMode === 'car' && (
                 <Typography sx={{ fontSize: '0.62rem', color: '#EF4444' }}>
-                  Cambia de modo para ver el ahorro
+                  {t('mob.calc.change_mode')}
                 </Typography>
               )}
             </Box>

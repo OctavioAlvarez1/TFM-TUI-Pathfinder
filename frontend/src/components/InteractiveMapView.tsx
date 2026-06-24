@@ -3,6 +3,7 @@ import { Box, Typography, LinearProgress } from '@mui/material'
 import { MapContainer, TileLayer, Circle, CircleMarker, Polyline, useMap } from 'react-leaflet'
 import CloseIcon from '@mui/icons-material/Close'
 import { useDestination } from '../context/DestinationContext'
+import { useLanguage } from '../context/LanguageContext'
 import { fetchCyclePaths } from '../api/overpass'
 import type { CyclePath } from '../api/overpass'
 import 'leaflet/dist/leaflet.css'
@@ -26,15 +27,15 @@ interface RouteResult {
   color: string; distKm: number; timeMin: number; co2gKm: number; co2SavedG: number
 }
 
-const ROUTE_POIS: RoutePOI[] = [
-  { id: 'station', label: 'Estación central', icon: '🚉', dlat:  0.012, dlon: -0.008 },
-  { id: 'airport', label: 'Aeropuerto',        icon: '✈️', dlat: -0.055, dlon: -0.045 },
-  { id: 'hotel',   label: 'Hotel centro',      icon: '🏨', dlat:  0.003, dlon:  0.005 },
-  { id: 'beach',   label: 'Playa principal',   icon: '🏖️', dlat: -0.018, dlon:  0.032 },
-  { id: 'museum',  label: 'Museo principal',   icon: '🏛️', dlat:  0.007, dlon: -0.004 },
-  { id: 'market',  label: 'Mercado central',   icon: '🛒', dlat:  0.001, dlon:  0.002 },
-  { id: 'park',    label: 'Área natural',      icon: '🌿', dlat:  0.042, dlon: -0.028 },
-  { id: 'port',    label: 'Puerto deportivo',  icon: '⚓', dlat: -0.012, dlon:  0.038 },
+const ROUTE_POIS_BASE: Omit<RoutePOI, 'label'>[] = [
+  { id: 'station', icon: '🚉', dlat:  0.012, dlon: -0.008 },
+  { id: 'airport', icon: '✈️', dlat: -0.055, dlon: -0.045 },
+  { id: 'hotel',   icon: '🏨', dlat:  0.003, dlon:  0.005 },
+  { id: 'beach',   icon: '🏖️', dlat: -0.018, dlon:  0.032 },
+  { id: 'museum',  icon: '🏛️', dlat:  0.007, dlon: -0.004 },
+  { id: 'market',  icon: '🛒', dlat:  0.001, dlon:  0.002 },
+  { id: 'park',    icon: '🌿', dlat:  0.042, dlon: -0.028 },
+  { id: 'port',    icon: '⚓', dlat: -0.012, dlon:  0.038 },
 ]
 
 function calcRouteOptions(origin: RoutePOI, dest: RoutePOI, baseLat: number): RouteResult[] {
@@ -43,9 +44,9 @@ function calcRouteOptions(origin: RoutePOI, dest: RoutePOI, baseLat: number): Ro
   const dLon     = (dest.dlon - origin.dlon) * 111 * cosLat
   const directKm = Math.sqrt(dLat * dLat + dLon * dLon)
   const MODES = [
-    { mode: 'walk'    as const, label: 'A pie',      icon: '🚶', color: '#2D6A4F', kmFactor: 1.30, kmhSpeed: 4.8,  co2gKm: 0,  waitMin: 0 },
-    { mode: 'bike'    as const, label: 'Bicicleta',  icon: '🚲', color: '#2E7D98', kmFactor: 1.20, kmhSpeed: 14.0, co2gKm: 0,  waitMin: 2 },
-    { mode: 'transit' as const, label: 'Transporte', icon: '🚌', color: '#1A3C5E', kmFactor: 1.55, kmhSpeed: 18.0, co2gKm: 28, waitMin: 5 },
+    { mode: 'walk'    as const, label: 'walk',    icon: '🚶', color: '#2D6A4F', kmFactor: 1.30, kmhSpeed: 4.8,  co2gKm: 0,  waitMin: 0 },
+    { mode: 'bike'    as const, label: 'bike',    icon: '🚲', color: '#2E7D98', kmFactor: 1.20, kmhSpeed: 14.0, co2gKm: 0,  waitMin: 2 },
+    { mode: 'transit' as const, label: 'transit', icon: '🚌', color: '#1A3C5E', kmFactor: 1.55, kmhSpeed: 18.0, co2gKm: 28, waitMin: 5 },
   ]
   return MODES.map(m => {
     const distKm    = Math.round(directKm * m.kmFactor * 10) / 10
@@ -143,29 +144,16 @@ function generateZones(lat: number, lon: number, destId: string, mode: Mode): He
   return zones
 }
 
-const MODE_META: Record<Exclude<Mode, 'rutas'>, {
-  label: string; highLabel: string; lowLabel: string
+const MODE_COLORS: Record<Exclude<Mode, 'rutas'>, {
   highColor: string; midColor: string; lowColor: string
 }> = {
-  concentracion: {
-    label: 'Concentración turística',
-    highLabel: 'Saturado', lowLabel: 'Infrautilizado',
-    highColor: '#EF4444', midColor: '#F59E0B', lowColor: '#10B981',
-  },
-  accesibilidad: {
-    label: 'Índice de accesibilidad',
-    highLabel: 'Alta accesibilidad', lowLabel: 'Baja accesibilidad',
-    highColor: '#2D6A4F', midColor: '#2E7D98', lowColor: '#EF4444',
-  },
-  movilidad: {
-    label: 'Cobertura movilidad sostenible',
-    highLabel: 'Bien conectado', lowLabel: 'Sin cobertura',
-    highColor: '#1A3C5E', midColor: '#2E7D98', lowColor: '#C05928',
-  },
+  concentracion: { highColor: '#EF4444', midColor: '#F59E0B', lowColor: '#10B981' },
+  accesibilidad: { highColor: '#2D6A4F', midColor: '#2E7D98', lowColor: '#EF4444' },
+  movilidad:     { highColor: '#1A3C5E', midColor: '#2E7D98', lowColor: '#C05928' },
 }
 
 function zoneColor(mode: Exclude<Mode, 'rutas'>, type: ZoneType): string {
-  const m = MODE_META[mode]
+  const m = MODE_COLORS[mode]
   if (type === 'hot')    return m.highColor
   if (type === 'medium') return m.midColor
   return m.lowColor
@@ -187,20 +175,10 @@ function generateStats(destId: string) {
   }
 }
 
-const ZONE_NAME_HOT    = ['Centro histórico', 'Zona litoral', 'Paseo marítimo', 'Casco antiguo']
-const ZONE_NAME_MEDIUM = ['Barrio Ruzafa', 'Área pericentral', 'Ensanche norte']
-const ZONE_NAME_COOL   = ['Zona rural', 'Interior comarca', 'Área agrícola', 'Periferia sur', 'Hinterland']
-
-function zoneName(zone: HeatZone, idx: number): string {
-  if (zone.type === 'hot')    return ZONE_NAME_HOT[idx % ZONE_NAME_HOT.length]
-  if (zone.type === 'medium') return ZONE_NAME_MEDIUM[idx % ZONE_NAME_MEDIUM.length]
-  return ZONE_NAME_COOL[idx % ZONE_NAME_COOL.length]
-}
-
-const RECOMMENDATIONS: Record<ZoneType, string[]> = {
-  hot:    ['Redistribuir flujo hacia zonas alternativas', 'Aplicar límite de capacidad temporal', 'Promocionar destinos próximos infrautilizados'],
-  medium: ['Monitorizar evolución de demanda', 'Reforzar señalización turística', 'Desarrollar oferta complementaria'],
-  cool:   ['Crear rutas de descubrimiento', 'Impulsar visibilidad digital', 'Incluir en paquetes turísticos integrados'],
+function zoneName(zone: HeatZone, idx: number, hotNames: string[], medNames: string[], coolNames: string[]): string {
+  if (zone.type === 'hot')    return hotNames[idx % hotNames.length]
+  if (zone.type === 'medium') return medNames[idx % medNames.length]
+  return coolNames[idx % coolNames.length]
 }
 
 function MapController({ center, zoom }: { center: [number, number]; zoom: number }) {
@@ -231,6 +209,7 @@ function StatCard({ label, value, unit, color }: { label: string; value: number;
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function InteractiveMapView() {
   const { destination } = useDestination()
+  const { t } = useLanguage()
   const [mode,          setMode]          = useState<Mode>('concentracion')
   const [livePaths,     setLivePaths]     = useState<CyclePath[]>([])
   const [activeFilters, setActiveFilters] = useState<Set<ZoneType>>(new Set(['hot', 'medium', 'cool']))
@@ -247,6 +226,37 @@ export default function InteractiveMapView() {
     [destination.id, destination.lat, destination.lon, mode],
   )
   const stats = useMemo(() => generateStats(destination.id), [destination.id])
+
+  // ── Translated data ────────────────────────────────────────────────────────
+  const ROUTE_POIS = useMemo<RoutePOI[]>(() => {
+    const labels: Record<string, string> = {
+      station: t('imap.poi.station'), airport: t('imap.poi.airport'),
+      hotel: t('imap.poi.hotel'), beach: t('imap.poi.beach'),
+      museum: t('imap.poi.museum'), market: t('imap.poi.market'),
+      park: t('imap.poi.park'), port: t('imap.poi.port'),
+    }
+    return ROUTE_POIS_BASE.map(p => ({ ...p, label: labels[p.id] ?? p.id }))
+  }, [t])
+
+  const RMODE_LABEL: Record<'walk' | 'bike' | 'transit', string> = {
+    walk: t('imap.rmode.walk'), bike: t('imap.rmode.bike'), transit: t('imap.rmode.transit'),
+  }
+
+  const ZONE_HOT  = t('imap.zone.hot_names').split('|')
+  const ZONE_MED  = t('imap.zone.med_names').split('|')
+  const ZONE_COOL = t('imap.zone.cool_names').split('|')
+
+  const RECOMMENDATIONS_T: Record<ZoneType, string[]> = {
+    hot:    t('imap.rec.hot').split('|'),
+    medium: t('imap.rec.med').split('|'),
+    cool:   t('imap.rec.cool').split('|'),
+  }
+
+  const MODE_META_T = {
+    concentracion: { ...MODE_COLORS.concentracion, label: t('imap.meta.conc'), highLabel: t('imap.meta.conc.high'), lowLabel: t('imap.meta.conc.low') },
+    accesibilidad: { ...MODE_COLORS.accesibilidad, label: t('imap.meta.acc'),  highLabel: t('imap.meta.acc.high'),  lowLabel: t('imap.meta.acc.low')  },
+    movilidad:     { ...MODE_COLORS.movilidad,     label: t('imap.meta.mob'),  highLabel: t('imap.meta.mob.high'),  lowLabel: t('imap.meta.mob.low')  },
+  }
 
   useEffect(() => {
     setSelectedZone(null)
@@ -278,16 +288,16 @@ export default function InteractiveMapView() {
   const mapCenter: [number, number] = [destination.lat, destination.lon]
 
   const heatMode = mode !== 'rutas' ? mode : 'concentracion'
-  const cfg      = MODE_META[heatMode]
+  const cfg      = MODE_META_T[heatMode]
 
   const TYPES: Record<ZoneType, { label: string; color: string }> = {
-    hot:    { label: cfg.highLabel, color: cfg.highColor },
-    medium: { label: 'Moderado',    color: cfg.midColor  },
-    cool:   { label: cfg.lowLabel,  color: cfg.lowColor  },
+    hot:    { label: cfg.highLabel,             color: cfg.highColor },
+    medium: { label: t('imap.zone.moderate'),   color: cfg.midColor  },
+    cool:   { label: cfg.lowLabel,              color: cfg.lowColor  },
   }
 
   const primaryValue    = mode === 'concentracion' ? stats.saturacion : mode === 'accesibilidad' ? stats.accesib : stats.movilidad
-  const primaryLabel    = mode === 'concentracion' ? 'Índice de saturación' : mode === 'accesibilidad' ? 'Índice de accesibilidad' : 'Cobertura movilidad'
+  const primaryLabel    = mode === 'concentracion' ? t('imap.stat.sat') : mode === 'accesibilidad' ? t('imap.stat.acc') : t('imap.stat.mob')
   const primaryGradient = mode === 'concentracion'
     ? 'linear-gradient(90deg, #10B981 0%, #F59E0B 50%, #EF4444 100%)'
     : mode === 'accesibilidad'
@@ -296,28 +306,28 @@ export default function InteractiveMapView() {
 
   const modeMetrics = mode === 'concentracion'
     ? [
-        { label: 'Zonas críticas',  value: stats.zonasCrit,  unit: '',  color: '#EF4444' },
-        { label: 'Capacidad libre', value: stats.capacidad,  unit: '%', color: '#10B981' },
-        { label: 'Zonas vacías',    value: stats.zonasVacias,unit: '',  color: '#2D6A4F' },
-        { label: 'Sat. litoral',    value: Math.min(100, stats.saturacion + 11), unit: '%', color: '#C05928' },
+        { label: t('imap.stat.crit'),  value: stats.zonasCrit,  unit: '',  color: '#EF4444' },
+        { label: t('imap.stat.cap'),   value: stats.capacidad,  unit: '%', color: '#10B981' },
+        { label: t('imap.stat.empty'), value: stats.zonasVacias,unit: '',  color: '#2D6A4F' },
+        { label: t('imap.stat.coast'), value: Math.min(100, stats.saturacion + 11), unit: '%', color: '#C05928' },
       ]
     : mode === 'accesibilidad'
     ? [
-        { label: 'Cobertura transp.', value: stats.transporte, unit: '%', color: '#2E7D98' },
-        { label: 'Nodos accesibles',  value: Math.round(28 + stats.accesib * 0.9), unit: '', color: '#2D6A4F' },
-        { label: 'Barreras',          value: Math.max(2, Math.round(14 - stats.accesib * 0.11)), unit: '', color: '#EF4444' },
-        { label: 'Cobertura peat.',   value: Math.min(98, stats.accesib + 9), unit: '%', color: '#1A3C5E' },
+        { label: t('imap.stat.transport'), value: stats.transporte, unit: '%', color: '#2E7D98' },
+        { label: t('imap.stat.nodes'),     value: Math.round(28 + stats.accesib * 0.9), unit: '', color: '#2D6A4F' },
+        { label: t('imap.stat.barriers'),  value: Math.max(2, Math.round(14 - stats.accesib * 0.11)), unit: '', color: '#EF4444' },
+        { label: t('imap.stat.walk_cov'),  value: Math.min(98, stats.accesib + 9), unit: '%', color: '#1A3C5E' },
       ]
     : [
-        { label: 'Red ciclista',    value: stats.ciclismo,  unit: 'km', color: '#2D6A4F' },
-        { label: 'Paradas transp.', value: stats.paradast,  unit: '',   color: '#2E7D98' },
-        { label: 'Cobertura EV',    value: Math.round(stats.movilidad * 0.38), unit: '%', color: '#1A3C5E' },
-        { label: 'Emisiones evit.', value: stats.emisiones, unit: 't',  color: '#10B981' },
+        { label: t('imap.stat.cycle'),  value: stats.ciclismo,  unit: 'km', color: '#2D6A4F' },
+        { label: t('imap.stat.stops'),  value: stats.paradast,  unit: '',   color: '#2E7D98' },
+        { label: t('imap.stat.ev'),     value: Math.round(stats.movilidad * 0.38), unit: '%', color: '#1A3C5E' },
+        { label: t('imap.stat.emiss'),  value: stats.emisiones, unit: 't',  color: '#10B981' },
       ]
 
   const selZone = selectedZone !== null ? zones[selectedZone] : null
   const selColor = selZone ? zoneColor(heatMode, selZone.type) : null
-  const selRec   = selZone ? RECOMMENDATIONS[selZone.type] : []
+  const selRec   = selZone ? RECOMMENDATIONS_T[selZone.type] : []
 
   // Route overlay geometry
   const routeOrigin = ROUTE_POIS.find(p => p.id === routeOriginId)
@@ -332,7 +342,8 @@ export default function InteractiveMapView() {
     : []
 
   const MODE_LABELS: Record<Mode, string> = {
-    concentracion: 'Concentración', accesibilidad: 'Accesibilidad', movilidad: 'Movilidad', rutas: 'Rutas',
+    concentracion: t('imap.mode.conc'), accesibilidad: t('imap.mode.acc'),
+    movilidad: t('imap.mode.mob'), rutas: t('imap.mode.routes'),
   }
 
   return (
@@ -350,7 +361,7 @@ export default function InteractiveMapView() {
           <Box>
             <Typography sx={{ fontSize: '0.63rem', color: '#94A3B8', lineHeight: 1,
                                textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              Mapa interactivo
+              {t('imap.header')}
             </Typography>
             <Typography sx={{ fontSize: '0.86rem', fontWeight: 700, color: '#1A3C5E' }}>
               {destination.name}
@@ -470,32 +481,32 @@ export default function InteractiveMapView() {
                 display: 'flex', alignItems: 'center', gap: 1,
               }}>
                 <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: '#fff' }}>
-                  🗺️ Planificador de rutas
+                  🗺️ {t('imap.route.planner')}
                 </Typography>
               </Box>
               <Box sx={{ p: 1.5, display: 'flex', flexDirection: 'column', gap: 1 }}>
                 <Box>
                   <Typography sx={{ fontSize: '0.6rem', color: '#94A3B8', textTransform: 'uppercase',
                                      letterSpacing: '0.07em', fontWeight: 600, mb: 0.5 }}>
-                    📍 Origen
+                    📍 {t('imap.route.origin')}
                   </Typography>
                   <POISelect
                     value={routeOriginId}
                     onChange={id => { setRouteOriginId(id); setRouteResults(null) }}
                     options={ROUTE_POIS}
-                    placeholder="Seleccionar origen..."
+                    placeholder={t('imap.route.sel_origin')}
                   />
                 </Box>
                 <Box>
                   <Typography sx={{ fontSize: '0.6rem', color: '#94A3B8', textTransform: 'uppercase',
                                      letterSpacing: '0.07em', fontWeight: 600, mb: 0.5 }}>
-                    🎯 Destino
+                    🎯 {t('imap.route.dest')}
                   </Typography>
                   <POISelect
                     value={routeDestId}
                     onChange={id => { setRouteDestId(id); setRouteResults(null) }}
                     options={ROUTE_POIS.filter(p => p.id !== routeOriginId)}
-                    placeholder="Seleccionar destino..."
+                    placeholder={t('imap.route.sel_dest')}
                   />
                 </Box>
                 <Box
@@ -513,7 +524,7 @@ export default function InteractiveMapView() {
                     fontSize: '0.75rem', fontWeight: 700,
                     color: routeOriginId && routeDestId ? '#fff' : '#94A3B8',
                   }}>
-                    Calcular ruta
+                    {t('imap.route.calc')}
                   </Typography>
                 </Box>
               </Box>
@@ -576,7 +587,7 @@ export default function InteractiveMapView() {
                   sx={{ mt: 0.8, pt: 0.8, borderTop: '1px solid #F0EBE5', cursor: 'pointer',
                         '&:hover': { opacity: 0.7 } }}>
                   <Typography sx={{ fontSize: '0.6rem', color: '#C05928', fontWeight: 600 }}>
-                    Mostrar todos
+                    {t('imap.zone.show_all')}
                   </Typography>
                 </Box>
               )}
@@ -608,7 +619,7 @@ export default function InteractiveMapView() {
           }}>
             <Typography sx={{ fontSize: '0.58rem', color: 'rgba(255,255,255,0.45)',
                                textTransform: 'uppercase', letterSpacing: '0.1em', mb: 0.5 }}>
-              {mode === 'rutas' ? 'Planificador de rutas' : 'Análisis del destino'}
+              {mode === 'rutas' ? t('imap.route.planner') : t('imap.panel.dest')}
             </Typography>
             <Typography sx={{ fontSize: '1rem', fontWeight: 800, color: '#fff', lineHeight: 1.2 }}>
               {destination.name}
@@ -630,13 +641,13 @@ export default function InteractiveMapView() {
                   }}>
                     <Typography sx={{ fontSize: '2.2rem', lineHeight: 1 }}>🗺️</Typography>
                     <Typography sx={{ fontSize: '0.78rem', color: '#64748B', lineHeight: 1.6, maxWidth: 180 }}>
-                      Selecciona origen y destino en el panel del mapa para comparar rutas accesibles
+                      {t('imap.route.prompt')}
                     </Typography>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.7, width: '100%', mt: 1 }}>
                       {[
-                        { icon: '🚶', label: 'A pie', desc: 'Rutas peatonales accesibles', color: '#2D6A4F' },
-                        { icon: '🚲', label: 'Bicicleta', desc: 'Carriles bici y zonas ciclables', color: '#2E7D98' },
-                        { icon: '🚌', label: 'Transporte', desc: 'Autobús y metro accesibles', color: '#1A3C5E' },
+                        { icon: '🚶', mode: 'walk' as const, desc: t('imap.route.walk_desc'), color: '#2D6A4F' },
+                        { icon: '🚲', mode: 'bike' as const, desc: t('imap.route.bike_desc'), color: '#2E7D98' },
+                        { icon: '🚌', mode: 'transit' as const, desc: t('imap.route.transit_desc'), color: '#1A3C5E' },
                       ].map(m => (
                         <Box key={m.label} sx={{
                           display: 'flex', alignItems: 'center', gap: 1, px: 1.2, py: 0.8,
@@ -644,7 +655,7 @@ export default function InteractiveMapView() {
                         }}>
                           <Typography sx={{ fontSize: '1rem' }}>{m.icon}</Typography>
                           <Box>
-                            <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: m.color }}>{m.label}</Typography>
+                            <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: m.color }}>{RMODE_LABEL[m.mode]}</Typography>
                             <Typography sx={{ fontSize: '0.62rem', color: '#94A3B8' }}>{m.desc}</Typography>
                           </Box>
                         </Box>
@@ -655,7 +666,7 @@ export default function InteractiveMapView() {
                   <>
                     {/* Route summary */}
                     <Box sx={{ p: 1.5, borderRadius: '10px', background: '#fff', border: '1px solid #E0D8CF' }}>
-                      <Typography sx={{ fontSize: '0.62rem', color: '#94A3B8', mb: 0.5, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Ruta calculada</Typography>
+                      <Typography sx={{ fontSize: '0.62rem', color: '#94A3B8', mb: 0.5, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('imap.route.result')}</Typography>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
                         <Box sx={{ width: 10, height: 10, borderRadius: '50%', background: '#2D6A4F', flexShrink: 0 }} />
                         <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#1A3C5E' }}>
@@ -684,7 +695,7 @@ export default function InteractiveMapView() {
                           <Typography sx={{
                             fontSize: '0.6rem', fontWeight: 600, mt: 0.2,
                             color: routeTransport === r.mode ? '#fff' : '#64748B',
-                          }}>{r.label}</Typography>
+                          }}>{RMODE_LABEL[r.mode]}</Typography>
                         </Box>
                       ))}
                     </Box>
@@ -704,9 +715,9 @@ export default function InteractiveMapView() {
                           <Typography sx={{ fontSize: '0.8rem', color: '#64748B' }}>min</Typography>
                         </Box>
                         {[
-                          { label: 'Distancia', value: `${activeResult.distKm} km`, color: '#1A3C5E' },
-                          { label: 'CO₂', value: activeResult.co2gKm === 0 ? '0 g — sostenible' : `${activeResult.co2gKm} g/km`, color: activeResult.co2gKm === 0 ? '#2D6A4F' : '#F59E0B' },
-                          ...(activeResult.co2SavedG > 0 ? [{ label: 'Ahorro vs 🚗', value: `↓ ${activeResult.co2SavedG} g CO₂`, color: '#2D6A4F' }] : []),
+                          { label: t('imap.route.dist'), value: `${activeResult.distKm} km`, color: '#1A3C5E' },
+                          { label: t('imap.route.co2'), value: activeResult.co2gKm === 0 ? t('imap.route.co2_zero') : `${activeResult.co2gKm} g/km`, color: activeResult.co2gKm === 0 ? '#2D6A4F' : '#F59E0B' },
+                          ...(activeResult.co2SavedG > 0 ? [{ label: t('imap.route.saving'), value: `↓ ${activeResult.co2SavedG} g CO₂`, color: '#2D6A4F' }] : []),
                         ].map(item => (
                           <Box key={item.label} sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.4 }}>
                             <Typography sx={{ fontSize: '0.7rem', color: '#94A3B8' }}>{item.label}</Typography>
@@ -720,7 +731,7 @@ export default function InteractiveMapView() {
                     <Box>
                       <Typography sx={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.08em',
                                          color: '#94A3B8', fontWeight: 600, mb: 0.8 }}>
-                        Comparativa de modos
+                        {t('imap.route.compare')}
                       </Typography>
                       {routeResults.map(r => (
                         <Box key={r.mode} sx={{
@@ -731,7 +742,7 @@ export default function InteractiveMapView() {
                           cursor: 'pointer',
                         }} onClick={() => setRouteTransport(r.mode)}>
                           <Typography sx={{ fontSize: '0.9rem', width: 20 }}>{r.icon}</Typography>
-                          <Typography sx={{ fontSize: '0.7rem', color: '#475569', flex: 1 }}>{r.label}</Typography>
+                          <Typography sx={{ fontSize: '0.7rem', color: '#475569', flex: 1 }}>{RMODE_LABEL[r.mode]}</Typography>
                           <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: r.color }}>{r.timeMin} min</Typography>
                         </Box>
                       ))}
@@ -740,7 +751,7 @@ export default function InteractiveMapView() {
                     <Box onClick={() => { setRouteResults(null); setRouteOriginId(null); setRouteDestId(null) }}
                       sx={{ mt: 'auto', pt: 1.5, borderTop: '1px solid #EDE8E3', cursor: 'pointer',
                             textAlign: 'center', '&:hover': { opacity: 0.7 } }}>
-                      <Typography sx={{ fontSize: '0.7rem', color: '#C05928', fontWeight: 600 }}>← Nueva ruta</Typography>
+                      <Typography sx={{ fontSize: '0.7rem', color: '#C05928', fontWeight: 600 }}>{t('imap.route.new')}</Typography>
                     </Box>
                   </>
                 )}
@@ -773,17 +784,17 @@ export default function InteractiveMapView() {
                     </Box>
                     <Box sx={{ px: 1.4, py: 1 }}>
                       <Typography sx={{ fontSize: '0.72rem', fontWeight: 600, color: '#1A3C5E', mb: 0.3 }}>
-                        {zoneName(selZone, selectedZone!)}
+                        {zoneName(selZone, selectedZone!, ZONE_HOT, ZONE_MED, ZONE_COOL)}
                       </Typography>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
-                        <Typography sx={{ fontSize: '0.62rem', color: '#94A3B8' }}>Intensidad:</Typography>
+                        <Typography sx={{ fontSize: '0.62rem', color: '#94A3B8' }}>{t('imap.zone.intensity')}</Typography>
                         <Typography sx={{ fontSize: '0.62rem', fontWeight: 700, color: selColor }}>
                           {Math.round(selZone.intensity * 100)}%
                         </Typography>
                       </Box>
                       <Typography sx={{ fontSize: '0.6rem', color: '#64748B', fontWeight: 600, mb: 0.5,
                                          textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                        Recomendación
+                        {t('imap.zone.rec_title')}
                       </Typography>
                       {selRec.slice(0, 2).map((r, i) => (
                         <Box key={i} sx={{ display: 'flex', gap: 0.6, mb: 0.4 }}>
@@ -823,19 +834,19 @@ export default function InteractiveMapView() {
                 <Box>
                   <Typography sx={{ fontSize: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.08em',
                                      color: '#94A3B8', fontWeight: 600, mb: 0.9 }}>
-                    {mode === 'concentracion' ? 'Zonas de atención'
-                      : mode === 'accesibilidad' ? 'Brechas detectadas'
-                      : 'Oportunidades de mejora'}
+                    {mode === 'concentracion' ? t('imap.zone.watch_title')
+                      : mode === 'accesibilidad' ? t('imap.zone.gaps_title')
+                      : t('imap.zone.opp_title')}
                   </Typography>
                   {[
-                    { name: `Centro · ${destination.name}`,
-                      status: mode === 'concentracion' ? 'Saturada' : mode === 'accesibilidad' ? 'Accesible' : 'Bien conectada',
+                    { name: `${t('imap.zstat.center_prefix')} ${destination.name}`,
+                      status: mode === 'concentracion' ? t('imap.zstat.sat.center') : mode === 'accesibilidad' ? t('imap.zstat.acc.center') : t('imap.zstat.mob.center'),
                       color: mode === 'concentracion' ? '#EF4444' : '#10B981' },
-                    { name: 'Área litoral / periférica',
-                      status: mode === 'concentracion' ? 'Alta demanda' : mode === 'accesibilidad' ? 'Parcial' : 'Mejora pendiente',
+                    { name: t('imap.zstat.lit'),
+                      status: mode === 'concentracion' ? t('imap.zstat.sat.lit') : mode === 'accesibilidad' ? t('imap.zstat.acc.lit') : t('imap.zstat.mob.lit'),
                       color: '#F59E0B' },
-                    { name: 'Zona rural / interior',
-                      status: mode === 'concentracion' ? 'Infrautilizada' : mode === 'accesibilidad' ? 'Baja accesib.' : 'Sin cobertura',
+                    { name: t('imap.zstat.rur'),
+                      status: mode === 'concentracion' ? t('imap.zstat.sat.rur') : mode === 'accesibilidad' ? t('imap.zstat.acc.rur') : t('imap.zstat.mob.rur'),
                       color: mode === 'concentracion' ? '#10B981' : '#EF4444' },
                   ].map(z => (
                     <Box key={z.name} sx={{
@@ -860,7 +871,7 @@ export default function InteractiveMapView() {
                 {/* Footer */}
                 <Box sx={{ mt: 'auto', pt: 1, borderTop: '1px solid #EDE8E3' }}>
                   <Typography sx={{ fontSize: '0.58rem', color: '#B0A89E', lineHeight: 1.6 }}>
-                    Fuente: OpenStreetMap · Datos sintéticos<br />
+                    {t('imap.footer')}<br />
                     TUI Care Foundation · Reto 4
                   </Typography>
                 </Box>

@@ -3,6 +3,7 @@ import { Box, Typography } from '@mui/material'
 import { MapContainer, TileLayer, Polyline, Marker, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import { useDestination } from '../context/DestinationContext'
+import { useLanguage } from '../context/LanguageContext'
 import 'leaflet/dist/leaflet.css'
 
 function mkRng(seed: string) {
@@ -27,36 +28,40 @@ interface Route {
   highlights: string[]
 }
 
-const ROUTE_NAMES = [
-  'Ruta del Casco Histórico',
-  'Sendero de la Costa',
-  'Ruta Gastronómica',
-  'Paseo Cultural',
-  'Itinerario Verde',
-  'Ruta del Puerto',
-]
+const ROUTE_NAME_KEYS = [
+  'routes.name.hist',
+  'routes.name.coast',
+  'routes.name.gastro',
+  'routes.name.cult',
+  'routes.name.green',
+  'routes.name.port',
+] as const
 
-const HIGHLIGHTS_POOL = [
-  'Mercado central',
-  'Jardín histórico',
-  'Mirador panorámico',
-  'Museo etnográfico',
-  'Puerto deportivo',
-  'Plaza mayor',
-  'Iglesia barroca',
-  'Barrio pesquero',
-  'Palacio renacentista',
-  'Torre medieval',
-]
+const HIGHLIGHT_KEYS = [
+  'routes.hl.market',
+  'routes.hl.garden',
+  'routes.hl.viewpoint',
+  'routes.hl.museum',
+  'routes.hl.port',
+  'routes.hl.square',
+  'routes.hl.church',
+  'routes.hl.fishing',
+  'routes.hl.palace',
+  'routes.hl.tower',
+] as const
 
 const MODES: TransportMode[] = ['walk', 'bike', 'transit']
 const DIFFICULTIES: Difficulty[] = ['Fácil', 'Media', 'Difícil']
 const ACCESSIBILITIES: Accessibility[] = ['Alta', 'Media', 'Baja']
 
-const MODE_CONFIG: Record<TransportMode, { emoji: string; label: string; color: string; bg: string }> = {
-  walk:    { emoji: '🚶', label: 'A pie',    color: '#2D6A4F', bg: '#2D6A4F20' },
-  bike:    { emoji: '🚲', label: 'Bicicleta',color: '#2E7D98', bg: '#2E7D9820' },
-  transit: { emoji: '🚌', label: 'Transporte',color: '#1A3C5E', bg: '#1A3C5E20' },
+const MODE_COLORS: Record<TransportMode, { color: string; bg: string }> = {
+  walk:    { color: '#2D6A4F', bg: '#2D6A4F20' },
+  bike:    { color: '#2E7D98', bg: '#2E7D9820' },
+  transit: { color: '#1A3C5E', bg: '#1A3C5E20' },
+}
+
+const MODE_EMOJIS: Record<TransportMode, string> = {
+  walk: '🚶', bike: '🚲', transit: '🚌',
 }
 
 const ACCESSIBILITY_CONFIG: Record<Accessibility, { color: string; bg: string }> = {
@@ -65,18 +70,11 @@ const ACCESSIBILITY_CONFIG: Record<Accessibility, { color: string; bg: string }>
   Baja:  { color: '#EF4444', bg: '#EF444415' },
 }
 
-const DIFFICULTY_CONFIG: Record<Difficulty, { color: string }> = {
+const DIFFICULTY_COLORS: Record<Difficulty, { color: string }> = {
   Fácil:   { color: '#2D6A4F' },
   Media:   { color: '#F59E0B' },
   Difícil: { color: '#EF4444' },
 }
-
-const FILTER_OPTIONS: { value: FilterMode; label: string }[] = [
-  { value: 'all',     label: 'Todas' },
-  { value: 'walk',    label: '🚶 Pie' },
-  { value: 'bike',    label: '🚲 Bici' },
-  { value: 'transit', label: '🚌 Transporte' },
-]
 
 const GMAPS_MODE: Record<TransportMode, string> = {
   walk: 'walking', bike: 'bicycling', transit: 'transit',
@@ -141,9 +139,21 @@ function RouteDetailPanel({
   lon: number
   onBack: () => void
 }) {
-  const modeCfg = MODE_CONFIG[route.mode]
+  const { t } = useLanguage()
+
+  const modeLabelMap: Record<TransportMode, string> = {
+    walk: t('routes.mode.walk'), bike: t('routes.mode.bike'), transit: t('routes.mode.transit'),
+  }
+  const diffLabelMap: Record<Difficulty, string> = {
+    'Fácil': t('routes.diff.easy'), 'Media': t('routes.diff.med'), 'Difícil': t('routes.diff.hard'),
+  }
+  const accLabelMap: Record<Accessibility, string> = {
+    'Alta': t('routes.acc.high'), 'Media': t('routes.acc.med'), 'Baja': t('routes.acc.low'),
+  }
+
+  const modeCfg = { ...MODE_COLORS[route.mode], emoji: MODE_EMOJIS[route.mode], label: modeLabelMap[route.mode] }
   const accCfg  = ACCESSIBILITY_CONFIG[route.accessibility]
-  const diffCfg = DIFFICULTY_CONFIG[route.difficulty]
+  const diffCfg = DIFFICULTY_COLORS[route.difficulty]
 
   const waypoints = useMemo(
     () => generateWaypoints(lat, lon, route.stops, route.name),
@@ -193,7 +203,7 @@ function RouteDetailPanel({
           boxShadow: '0 2px 8px rgba(26,60,94,0.12)',
         }}>
           <Typography sx={{ fontSize: '0.62rem', color: '#94A3B8', fontWeight: 600, mb: 0.4 }}>
-            {route.stops} paradas · {route.distKm.toFixed(1)} km
+            {route.stops} {t('routes.detail.stops')} · {route.distKm.toFixed(1)} km
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6 }}>
             <Box sx={{ width: 20, height: 3, background: modeCfg.color, borderRadius: 2 }} />
@@ -223,16 +233,16 @@ function RouteDetailPanel({
             </Typography>
           </Box>
           <Typography sx={{ fontSize: '0.95rem', fontWeight: 800, color: '#1A3C5E', lineHeight: 1.3 }}>
-            {route.name}
+            {t(route.name as Parameters<typeof t>[0])}
           </Typography>
         </Box>
 
         {/* Stats */}
         <Box sx={{ px: 2, py: 1.5, display: 'flex', flexDirection: 'column', gap: 1 }}>
           {[
-            { label: 'Distancia',     val: `${route.distKm.toFixed(1)} km` },
-            { label: 'Duración',      val: `${route.timeMin} min` },
-            { label: 'Paradas',       val: String(route.stops) },
+            { label: t('routes.detail.dist'),  val: `${route.distKm.toFixed(1)} km` },
+            { label: t('routes.detail.dur'),   val: `${route.timeMin} min` },
+            { label: t('routes.detail.stops'), val: String(route.stops) },
           ].map(({ label, val }) => (
             <Box key={label} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Typography sx={{ fontSize: '0.72rem', color: '#94A3B8' }}>{label}</Typography>
@@ -242,26 +252,26 @@ function RouteDetailPanel({
 
           {/* Difficulty */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography sx={{ fontSize: '0.72rem', color: '#94A3B8' }}>Dificultad</Typography>
+            <Typography sx={{ fontSize: '0.72rem', color: '#94A3B8' }}>{t('routes.detail.diff')}</Typography>
             <Box sx={{
               px: 0.8, py: 0.2, borderRadius: '6px',
               background: `${diffCfg.color}15`, border: `1px solid ${diffCfg.color}40`,
             }}>
               <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, color: diffCfg.color }}>
-                {route.difficulty}
+                {diffLabelMap[route.difficulty]}
               </Typography>
             </Box>
           </Box>
 
           {/* Accessibility */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography sx={{ fontSize: '0.72rem', color: '#94A3B8' }}>Accesibilidad</Typography>
+            <Typography sx={{ fontSize: '0.72rem', color: '#94A3B8' }}>{t('routes.detail.acc')}</Typography>
             <Box sx={{
               px: 0.8, py: 0.2, borderRadius: '6px',
               background: accCfg.bg, border: `1px solid ${accCfg.color}40`,
             }}>
               <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, color: accCfg.color }}>
-                ♿ {route.accessibility}
+                ♿ {accLabelMap[route.accessibility]}
               </Typography>
             </Box>
           </Box>
@@ -272,7 +282,7 @@ function RouteDetailPanel({
             background: 'rgba(45,106,79,0.08)', border: '1px solid rgba(45,106,79,0.2)',
           }}>
             <Typography sx={{ fontSize: '0.71rem', color: '#2D6A4F', fontWeight: 600 }}>
-              🌿 {route.co2Saved > 0 ? `${route.co2Saved}g CO₂ ahorrado` : '0 emisiones directas'}
+              🌿 {route.co2Saved > 0 ? `${route.co2Saved}g ${t('routes.detail.co2_saved')}` : t('routes.detail.zero_emiss')}
             </Typography>
           </Box>
         </Box>
@@ -286,7 +296,7 @@ function RouteDetailPanel({
             fontSize: '0.63rem', color: '#94A3B8', textTransform: 'uppercase',
             letterSpacing: '0.08em', fontWeight: 600, mb: 1,
           }}>
-            Puntos de interés
+            {t('routes.detail.highlights')}
           </Typography>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.8 }}>
             {route.highlights.map((h, i) => (
@@ -300,7 +310,7 @@ function RouteDetailPanel({
                     {i + 1}
                   </Typography>
                 </Box>
-                <Typography sx={{ fontSize: '0.72rem', color: '#475569' }}>{h}</Typography>
+                <Typography sx={{ fontSize: '0.72rem', color: '#475569' }}>{t(h as Parameters<typeof t>[0])}</Typography>
               </Box>
             ))}
           </Box>
@@ -328,7 +338,7 @@ function RouteDetailPanel({
               },
             }}
           >
-            Abrir en Google Maps →
+            {t('routes.detail.gmaps')}
           </Box>
         </Box>
       </Box>
@@ -338,9 +348,21 @@ function RouteDetailPanel({
 
 // ── Route card ────────────────────────────────────────────────────────────────
 function RouteCard({ route, onSelect }: { route: Route; onSelect: () => void }) {
-  const modeCfg = MODE_CONFIG[route.mode]
+  const { t } = useLanguage()
+
+  const modeLabelMap: Record<TransportMode, string> = {
+    walk: t('routes.mode.walk'), bike: t('routes.mode.bike'), transit: t('routes.mode.transit'),
+  }
+  const diffLabelMap: Record<Difficulty, string> = {
+    'Fácil': t('routes.diff.easy'), 'Media': t('routes.diff.med'), 'Difícil': t('routes.diff.hard'),
+  }
+  const accLabelMap: Record<Accessibility, string> = {
+    'Alta': t('routes.acc.high'), 'Media': t('routes.acc.med'), 'Baja': t('routes.acc.low'),
+  }
+
+  const modeCfg = { ...MODE_COLORS[route.mode], emoji: MODE_EMOJIS[route.mode], label: modeLabelMap[route.mode] }
   const accCfg  = ACCESSIBILITY_CONFIG[route.accessibility]
-  const diffCfg = DIFFICULTY_CONFIG[route.difficulty]
+  const diffCfg = DIFFICULTY_COLORS[route.difficulty]
 
   return (
     <Box sx={{
@@ -368,7 +390,7 @@ function RouteCard({ route, onSelect }: { route: Route; onSelect: () => void }) 
         </Box>
         <Box sx={{ px: 0.8, py: 0.2, borderRadius: '20px', background: accCfg.bg, border: `1px solid ${accCfg.color}40` }}>
           <Typography sx={{ fontSize: '0.6rem', fontWeight: 700, color: accCfg.color, whiteSpace: 'nowrap' }}>
-            ♿ {route.accessibility}
+            ♿ {accLabelMap[route.accessibility]}
           </Typography>
         </Box>
       </Box>
@@ -376,14 +398,14 @@ function RouteCard({ route, onSelect }: { route: Route; onSelect: () => void }) 
       {/* Body */}
       <Box sx={{ p: 1.5, display: 'flex', flexDirection: 'column', gap: 1, flex: 1 }}>
         <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#1A3C5E', lineHeight: 1.3 }}>
-          {route.name}
+          {t(route.name as Parameters<typeof t>[0])}
         </Typography>
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           {[
             { icon: '📍', val: `${route.distKm.toFixed(1)} km` },
             { icon: '⏱',  val: `${route.timeMin} min` },
-            { icon: '🗺',  val: `${route.stops} paradas` },
+            { icon: '🗺',  val: `${route.stops} ${t('routes.card.stops')}` },
           ].map(({ icon, val }) => (
             <Box key={val} sx={{ display: 'flex', alignItems: 'center', gap: 0.4 }}>
               <Typography sx={{ fontSize: '0.75rem', color: '#94A3B8' }}>{icon}</Typography>
@@ -395,18 +417,18 @@ function RouteCard({ route, onSelect }: { route: Route; onSelect: () => void }) 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Box sx={{ px: 0.8, py: 0.2, borderRadius: '6px', background: `${diffCfg.color}15`, border: `1px solid ${diffCfg.color}40` }}>
             <Typography sx={{ fontSize: '0.62rem', fontWeight: 600, color: diffCfg.color }}>
-              {route.difficulty}
+              {diffLabelMap[route.difficulty]}
             </Typography>
           </Box>
           <Typography sx={{ fontSize: '0.67rem', color: '#2D6A4F', fontWeight: 500 }}>
-            🌿 {route.co2Saved > 0 ? `${route.co2Saved}g CO₂ ahorrado` : '0 emisiones'}
+            🌿 {route.co2Saved > 0 ? `${route.co2Saved}g ${t('routes.card.co2')}` : t('routes.card.zero_emiss')}
           </Typography>
         </Box>
 
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
           {route.highlights.map((h) => (
             <Box key={h} sx={{ px: 0.8, py: 0.25, borderRadius: '6px', background: '#F1EDE7', border: '1px solid #E0D8CF' }}>
-              <Typography sx={{ fontSize: '0.62rem', color: '#64748B' }}>{h}</Typography>
+              <Typography sx={{ fontSize: '0.62rem', color: '#64748B' }}>{t(h as Parameters<typeof t>[0])}</Typography>
             </Box>
           ))}
         </Box>
@@ -432,7 +454,7 @@ function RouteCard({ route, onSelect }: { route: Route; onSelect: () => void }) 
             },
           }}
         >
-          Ver ruta →
+          {t('routes.card.view')}
         </Box>
       </Box>
     </Box>
@@ -442,8 +464,16 @@ function RouteCard({ route, onSelect }: { route: Route; onSelect: () => void }) 
 // ── Main view ─────────────────────────────────────────────────────────────────
 export default function TouristRoutesView() {
   const { destination } = useDestination()
+  const { t } = useLanguage()
   const [filter, setFilter]             = useState<FilterMode>('all')
   const [selectedRoute, setSelectedRoute] = useState<Route | null>(null)
+
+  const FILTER_OPTIONS: { value: FilterMode; label: string }[] = [
+    { value: 'all',     label: t('routes.filter.all') },
+    { value: 'walk',    label: t('routes.filter.walk') },
+    { value: 'bike',    label: t('routes.filter.bike') },
+    { value: 'transit', label: t('routes.filter.transit') },
+  ]
 
   // Reset selection on destination change
   useEffect(() => { setSelectedRoute(null) }, [destination.id])
@@ -451,7 +481,7 @@ export default function TouristRoutesView() {
   const routes = useMemo<Route[]>(() => {
     const rng = mkRng(destination.id + 'routes')
 
-    return ROUTE_NAMES.map((name) => {
+    return ROUTE_NAME_KEYS.map((nameKey) => {
       const mode         = MODES[Math.floor(rng() * MODES.length)]
       const distKm       = parseFloat((1.2 + rng() * 10.8).toFixed(1))
       const timeMin      = Math.round(20 + rng() * 160)
@@ -459,9 +489,9 @@ export default function TouristRoutesView() {
       const accessibility = ACCESSIBILITIES[Math.floor(rng() * ACCESSIBILITIES.length)]
       const co2Saved     = (mode === 'walk' || mode === 'bike') ? 0 : Math.round(30 + rng() * 120)
       const stops        = Math.round(3 + rng() * 4)
-      const highlights   = pickN(HIGHLIGHTS_POOL, 3, rng)
+      const highlights   = pickN(HIGHLIGHT_KEYS as unknown as string[], 3, rng)
 
-      return { name, mode, distKm, timeMin, difficulty, accessibility, co2Saved, stops, highlights }
+      return { name: nameKey, mode, distKm, timeMin, difficulty, accessibility, co2Saved, stops, highlights }
     })
   }, [destination.id])
 
@@ -495,7 +525,7 @@ export default function TouristRoutesView() {
                 mr: 0.5,
               }}
             >
-              ← Rutas
+              {t('routes.back')}
             </Box>
           )}
           <Box sx={{ width: 4, height: 28, borderRadius: 2, background: '#C05928', flexShrink: 0 }} />
@@ -504,7 +534,7 @@ export default function TouristRoutesView() {
               fontSize: '0.63rem', color: '#94A3B8', lineHeight: 1,
               textTransform: 'uppercase', letterSpacing: '0.06em',
             }}>
-              {selectedRoute ? selectedRoute.name : 'Rutas Turísticas'}
+              {selectedRoute ? t(selectedRoute.name as Parameters<typeof t>[0]) : t('routes.header')}
             </Typography>
             <Typography sx={{ fontSize: '0.86rem', fontWeight: 700, color: '#1A3C5E' }}>
               {destination.name}
@@ -560,7 +590,7 @@ export default function TouristRoutesView() {
             }}>
               <Typography sx={{ fontSize: '2rem' }}>🗺</Typography>
               <Typography sx={{ fontSize: '0.86rem', color: '#94A3B8' }}>
-                No hay rutas disponibles para este modo de transporte
+                {t('routes.empty')}
               </Typography>
             </Box>
           ) : (

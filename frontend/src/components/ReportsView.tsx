@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Box, Typography, IconButton } from '@mui/material'
 import DownloadIcon from '@mui/icons-material/Download'
 import { useDestination } from '../context/DestinationContext'
+import { useLanguage } from '../context/LanguageContext'
 
 type ReportStatus = 'Listo' | 'Procesando' | 'Programado'
 type ReportType = 'PDF' | 'Excel'
@@ -235,10 +236,16 @@ function TypeBadge({ type }: { type: ReportType }) {
 }
 
 function StatusBadge({ status }: { status: ReportStatus }) {
+  const { t } = useLanguage()
   const color = STATUS_COLORS[status]
+  const STATUS_LABEL: Record<ReportStatus, string> = {
+    Listo: t('reports.status.ready'),
+    Procesando: t('reports.status.processing'),
+    Programado: t('reports.status.scheduled'),
+  }
   return (
     <Box sx={{ display: 'inline-flex', alignItems: 'center', px: 1, py: 0.3, borderRadius: '20px', background: `${color}15`, border: `1px solid ${color}40` }}>
-      <Typography sx={{ fontSize: '0.62rem', fontWeight: 600, color, whiteSpace: 'nowrap' }}>{status}</Typography>
+      <Typography sx={{ fontSize: '0.62rem', fontWeight: 600, color, whiteSpace: 'nowrap' }}>{STATUS_LABEL[status]}</Typography>
     </Box>
   )
 }
@@ -256,6 +263,7 @@ function SpinnerIcon() {
 // ── Main view ─────────────────────────────────────────────────────────────────
 export default function ReportsView() {
   const { destination } = useDestination()
+  const { t } = useLanguage()
   const [downloading, setDownloading] = useState<string | null>(null)
 
   function onDownload(report: Report) {
@@ -281,7 +289,7 @@ export default function ReportsView() {
           <Box sx={{ width: 4, height: 28, borderRadius: 2, background: '#C05928', flexShrink: 0 }} />
           <Box>
             <Typography sx={{ fontSize: '0.63rem', color: '#94A3B8', lineHeight: 1, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              Informes
+              {t('reports.header')}
             </Typography>
             <Typography sx={{ fontSize: '0.86rem', fontWeight: 700, color: '#1A3C5E' }}>
               {destination.name}
@@ -300,7 +308,7 @@ export default function ReportsView() {
           }}
         >
           <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#C05928' }}>
-            + Nuevo informe
+            {t('reports.new')}
           </Typography>
         </Box>
       </Box>
@@ -309,24 +317,29 @@ export default function ReportsView() {
       <Box sx={{ flex: 1, overflowY: 'auto', p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
 
         <Box sx={{ display: 'flex', gap: 1.5, flexShrink: 0 }}>
-          <StatCard label="Informes disponibles" value={12}    color="#1A3C5E" />
-          <StatCard label="Última generación"    value="Hoy"  color="#2D6A4F" />
-          <StatCard label="Descargados este mes" value={47}   color="#2E7D98" />
+          <StatCard label={t('reports.stat.available')} value={12}                   color="#1A3C5E" />
+          <StatCard label={t('reports.stat.last_gen')}  value={t('reports.stat.today')} color="#2D6A4F" />
+          <StatCard label={t('reports.stat.downloads')} value={47}                   color="#2E7D98" />
         </Box>
 
         {/* Reports table */}
         <Box sx={{ background: '#fff', border: '1px solid #E0D8CF', borderRadius: '12px', boxShadow: '0 2px 8px rgba(26,60,94,0.07)', overflow: 'hidden' }}>
           {/* Table header */}
           <Box sx={{ display: 'flex', alignItems: 'center', px: 2, py: 1, background: '#F8F5F2', borderBottom: '1px solid #E0D8CF', gap: 1 }}>
-            {COLUMN_LABELS.map((col) => (
-              <Typography key={col} sx={{
-                fontSize: '0.6rem', fontWeight: 700, color: '#94A3B8',
-                textTransform: 'uppercase', letterSpacing: '0.08em',
-                flex: col === 'NOMBRE' ? 3 : col === 'ACCIONES' ? 0.7 : 1, minWidth: 0,
-              }}>
-                {col}
-              </Typography>
-            ))}
+            {(['col.name', 'col.type', 'col.date', 'col.status', 'col.actions'] as const).map((key) => {
+              const col = t(`reports.${key}` as Parameters<typeof t>[0])
+              const colKey = t('reports.col.name')
+              const actKey = t('reports.col.actions')
+              return (
+                <Typography key={key} sx={{
+                  fontSize: '0.6rem', fontWeight: 700, color: '#94A3B8',
+                  textTransform: 'uppercase', letterSpacing: '0.08em',
+                  flex: col === colKey ? 3 : col === actKey ? 0.7 : 1, minWidth: 0,
+                }}>
+                  {col}
+                </Typography>
+              )
+            })}
           </Box>
 
           {/* Table rows */}
@@ -370,7 +383,7 @@ export default function ReportsView() {
                       size="small"
                       disabled={isDownloading}
                       onClick={() => onDownload(report)}
-                      title={`Descargar ${report.name}`}
+                      title={`${t('reports.download_title')} ${report.name}`}
                       sx={{
                         color: isDownloading ? '#CBD5E1' : '#2E7D98',
                         transition: 'all 0.15s',
@@ -388,7 +401,7 @@ export default function ReportsView() {
                   {report.status === 'Programado' && (
                     <Box sx={{ px: 0.8, py: 0.25, borderRadius: '4px', background: '#2E7D9815', border: '1px solid #2E7D9840' }}>
                       <Typography sx={{ fontSize: '0.58rem', fontWeight: 600, color: '#2E7D98', whiteSpace: 'nowrap' }}>
-                        En cola
+                        {t('reports.queued')}
                       </Typography>
                     </Box>
                   )}

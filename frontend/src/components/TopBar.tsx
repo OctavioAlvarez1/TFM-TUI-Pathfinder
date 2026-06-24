@@ -15,7 +15,10 @@ function currentMonthRange(lang: Lang): string {
   return `${fmt(start)} – ${fmt(end)}`
 }
 
-const FLAG: Record<Lang, string> = { es: '🇪🇸', en: '🇺🇸' }
+const FLAG_SRC: Record<Lang, string> = {
+  es: 'https://flagcdn.com/w40/es.png',
+  en: 'https://flagcdn.com/w40/us.png',
+}
 
 export default function TopBar() {
   const { destination } = useDestination()
@@ -77,29 +80,6 @@ export default function TopBar() {
       {/* Right */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, position: 'relative', zIndex: 2 }}>
 
-        {/* Language flags */}
-        <Box sx={{ display: 'flex', gap: 0.4 }}>
-          {(['es', 'en'] as Lang[]).map(l => (
-            <Box
-              key={l}
-              onClick={() => setLang(l)}
-              sx={{
-                fontSize: '1.1rem', lineHeight: 1, cursor: 'pointer',
-                width: 28, height: 28,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                borderRadius: '6px',
-                background: lang === l ? 'rgba(255,255,255,0.22)' : 'transparent',
-                border: lang === l ? '1px solid rgba(255,255,255,0.35)' : '1px solid transparent',
-                transition: 'all 0.15s',
-                '&:hover': { background: 'rgba(255,255,255,0.15)' },
-                userSelect: 'none',
-              }}
-            >
-              {FLAG[l]}
-            </Box>
-          ))}
-        </Box>
-
         <Button
           endIcon={<KeyboardArrowDownIcon sx={{ fontSize: 13, color: 'rgba(255,255,255,0.45)' }} />}
           sx={{
@@ -127,6 +107,40 @@ export default function TopBar() {
         }}>
           <NotificationsNoneIcon sx={{ fontSize: 15 }} />
         </IconButton>
+
+        {/* Language flags — next to bell */}
+        <Box sx={{ display: 'flex', gap: 0.4 }}>
+          {(['es', 'en'] as Lang[]).map(l => (
+            <Box
+              key={l}
+              onClick={() => setLang(l)}
+              sx={{
+                cursor: 'pointer',
+                width: 28, height: 28,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                borderRadius: '6px',
+                background: lang === l ? 'rgba(255,255,255,0.22)' : 'transparent',
+                border: lang === l ? '1px solid rgba(255,255,255,0.4)' : '1px solid transparent',
+                transition: 'all 0.15s',
+                '&:hover': { background: 'rgba(255,255,255,0.15)' },
+                userSelect: 'none',
+                overflow: 'hidden',
+              }}
+            >
+              <Box
+                component="img"
+                src={FLAG_SRC[l]}
+                alt={l}
+                sx={{
+                  width: 22, height: 'auto',
+                  borderRadius: '3px',
+                  opacity: lang === l ? 1 : 0.55,
+                  transition: 'opacity 0.15s',
+                }}
+              />
+            </Box>
+          ))}
+        </Box>
 
         <Avatar
           src="https://i.pravatar.cc/150?img=47"

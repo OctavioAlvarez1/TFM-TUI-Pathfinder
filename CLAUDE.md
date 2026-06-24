@@ -4,76 +4,109 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Pathfinder** is a Streamlit multi-page dashboard for analysing sustainable mobility and transport accessibility across 20 Spanish tourism destinations. It is Reto 4 of the TUI Care Foundation Future Shapers Spain suite (UCM TFM, 2026).
+**Pathfinder** is a React + Vite single-page application for analysing sustainable mobility and transport accessibility across 20 Spanish tourism destinations. It is Reto 4 of the TUI Care Foundation Future Shapers Spain suite (UCM TFM, 2026).
 
-- **Stack**: Python · Streamlit · Folium · Plotly · pandas
-- **Data**: Synthetic transport accessibility data (auto-generated) + shared destination CSVs from Horizon
-- **Map**: Folium Leaflet map with CartoDB positron tiles (mobility score as circle size/colour)
+- **Stack**: React 18 · TypeScript · Vite · Material UI · React-Leaflet · Recharts · Framer Motion
+- **Data**: Deterministic synthetic data (RNG seeded by `destination.id`) + INE EOH API + Overpass API
+- **i18n**: Bilingual ES/EN via `LanguageContext` — all user-visible strings must use `t('key')`
+- **No backend**: Pure SPA — data is generated client-side, no server required
 
 ## Commands
 
 ```bash
-# Start Pathfinder (from project root)
-streamlit run app.py
-
-# Start on suite port
-streamlit run app.py --server.port 8503
+# Start Pathfinder (from frontend/ directory)
+cd frontend
+npm run dev              # http://localhost:5174
 
 # Install dependencies
-pip install -r requirements.txt
+npm install
+
+# TypeScript check
+npx tsc --noEmit
+
+# Build for production
+npm run build
 ```
 
 ## Architecture
 
 ```
-src/
-├── config/settings.py         # Paths + DESTINATION_COORDS + CARBON_BY_MODE + mobility_color
+frontend/src/
+├── api/
+│   ├── ine.ts               # INE EOH pernoctaciones API client
+│   └── overpass.ts          # Overpass API — cycle paths
+├── components/
+│   ├── TopBar.tsx           # Header: language flags, date range, avatar
+│   ├── Sidebar.tsx          # Navigation + destination selector
+│   ├── ModalDonut.tsx       # Modal share donut (home sidebar)
+│   ├── InteractiveMapView.tsx  # Leaflet map — 4 modes + route planner
+│   ├── AccessibilityView.tsx   # Barrier analysis + category bars
+│   ├── MobilityView.tsx        # Modal share + CO2 + carbon calculator
+│   ├── TouristRoutesView.tsx   # 6 synthetic routes with detail panel
+│   ├── AIRecsView.tsx          # 8 prioritised AI recommendations
+│   ├── AnalyticsView.tsx       # Monthly charts + peer comparison + INE
+│   └── ReportsView.tsx         # Report list + CSV/PDF download
+├── context/
+│   ├── DestinationContext.tsx  # Active destination global state
+│   └── LanguageContext.tsx     # i18n — useLanguage() -> { lang, setLang, t }
 ├── data/
-│   ├── data_loader.py         # @st.cache_data loaders
-│   └── transport_generator.py # Generates transport_accessibility.csv on first run
-└── components/
-    ├── map_builder.py         # build_mobility_map() — Folium map
-    └── chart_builder.py       # build_mobility_bar, build_transport_breakdown, build_carbon_bar
+│   ├── destinations.ts         # 20 destinations with coords, zoom, bboxDelta
+│   └── mockData.ts             # Modal share base data
+├── hooks/
+│   └── useDestinationPhoto.ts  # Destination hero photo (Unsplash)
+├── i18n/
+│   └── translations.ts         # All ES + EN strings — typed as const
+└── App.tsx                     # Main layout + view router
 ```
-
-### Pages
-
-| File | Page | Purpose |
-|---|---|---|
-| app.py | Home | KPI overview + overall mobility ranking |
-| pages/1_Connectivity_Map.py | Connectivity Map | Folium map — mobility score as circle size/colour |
-| pages/2_Transport_Comparison.py | Transport Comparison | Train/bus/EV breakdown + mode carbon chart |
-| pages/3_Carbon_Footprint.py | Carbon Footprint | Carbon per visitor + personal calculator |
-| pages/4_Accessibility_Index.py | Accessibility Index | Composite index + investment priorities |
-
-## Data Setup
-
-Pathfinder auto-detects data when both folders are on the same Desktop:
-
-```
-Desktop/
-├── TUI-Smart-Destination-Recommender/   ← has data/raw/*.csv
-└── TUI-Pathfinder/                       ← auto-detects it
-```
-
-Transport data is generated automatically on first run and saved to `data/transport/transport_accessibility.csv` (gitignored).
 
 ## Key Patterns
 
-### Mobility Score Formula
+### Deterministic synthetic data
+All synthetic values use `mkRng(seed)` — a deterministic LCG seeded by `destination.id + suffix`:
+```typescript
+function mkRng(seed: string) {
+  let s = [...seed].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) | 0, 1)
+  return () => { s = (Math.imul(s, 1664525) + 1013904223) | 0; return (s >>> 0) / 4294967296 }
+}
 ```
-overall_mobility_score = 0.45 × train_score + 0.30 × bus_score + 0.25 × (100 - airport_distance_factor)
+This guarantees the same numbers for the same destination on every render without a backend.
+
+### i18n — useLanguage hook
+```typescript
+const { t, lang, setLang } = useLanguage()
+// t() is typed — TypeScript enforces valid keys
+t('mob.kpi.cycle')          // simple string
+t('mob.months').split(',')  // comma/pipe-delimited arrays
+```
+Translation keys live in `src/i18n/translations.ts` under `es` and `en` objects. When adding new visible text, always add both language keys before using them.
+
+### Adding a translation key
+1. Add to `translations.ts` under **both** `es` and `en` objects
+2. Use `t('your.key')` in the component — TypeScript will error if the key is missing
+
+### Route name keys (TouristRoutesView)
+Route names are stored as translation key strings (e.g. `'routes.name.hist'`) and used as RNG seeds. Treat them as stable identifiers — changing a key changes the generated waypoints.
+
+### Pipe-delimited strings for arrays
+Long arrays (steps, zone names, recommendations) are stored as a single `|`-delimited string and split at usage:
+```typescript
+t('ai.steps.access').split('|')  // -> string[]
 ```
 
-### Mobility Thresholds (consistent across all files)
-- ≥ 75 → High (green `#10B981`)
-- 50–74 → Moderate (yellow `#F59E0B`)
-- < 50 → Low (red `#EF4444`)
+### Dynamic key lookup TypeScript cast
+When the key is a variable, cast to satisfy the type checker:
+```typescript
+t(someKey as Parameters<typeof t>[0])
+```
 
-### Carbon by Mode (kg CO₂ per 100 km)
+## Mobility Score Thresholds (consistent across all views)
+- >= 75 -> High (green `#10B981`)
+- 50-74 -> Moderate (amber `#F59E0B`)
+- < 50  -> Low (red `#EF4444`)
+
+## Carbon by Mode (kg CO2 per 100 km)
 - Train: 14 | Bus: 68 | Car: 170 | Flight: 255
 
 ## Suite Context
 
-Pathfinder is part of the 5-project TUI Care Foundation Suite. See SUITE.md for the full picture.
-Destinations with high mobility scores should receive boosted recommendations in Horizon and appear as sustainable alternatives in Atlas's redistribution scenarios.
+Pathfinder is Reto 4 of the 5-project TUI Care Foundation Suite. The 20 destinations are shared across all projects. See `SUITE.md` for the full picture and `docs/` for technical documentation.

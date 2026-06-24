@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Box, Typography } from '@mui/material'
 import { useDestination } from '../context/DestinationContext'
+import { useLanguage } from '../context/LanguageContext'
 
 function mkRng(seed: string) {
   let s = [...seed].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) | 0, 1)
@@ -106,10 +107,26 @@ function Chip({ label, bg, color, border }: { label: string; bg: string; color: 
 
 // ── Expanded detail section ───────────────────────────────────────────────────
 function RecDetail({ rec }: { rec: Recommendation }) {
-  const steps       = IMPL_STEPS[rec.category]     ?? IMPL_STEPS['Digital']
-  const kpis        = KPIS[rec.impact]
-  const stakeholders = STAKEHOLDERS[rec.category]  ?? []
-  const tuiBenefit  = TUI_BENEFIT[rec.priority]
+  const { t } = useLanguage()
+
+  const CAT_STEP_KEY: Record<string, string> = {
+    Accesibilidad: 'ai.steps.access', Movilidad: 'ai.steps.mobility',
+    Señalización: 'ai.steps.signage', Transporte: 'ai.steps.transport',
+    Infraestructura: 'ai.steps.infra', Digital: 'ai.steps.digital',
+  }
+  const steps        = t((CAT_STEP_KEY[rec.category] ?? 'ai.steps.digital') as Parameters<typeof t>[0]).split('|')
+  const kpis         = KPIS[rec.impact]
+  const stakeholders = STAKEHOLDERS[rec.category] ?? []
+  const tuiBenefit   = t(({ high: 'ai.tui.high', medium: 'ai.tui.med', low: 'ai.tui.low' } as const)[rec.priority])
+
+  const KPI_LABELS = {
+    'Usuarios beneficiados':     t('ai.kpi.users'),
+    'Satisfacción estimada':     t('ai.kpi.satisfaction'),
+    'Reducción de incidencias':  t('ai.kpi.incidents'),
+  }
+  const LEVEL_LABEL: Record<'Alto' | 'Medio' | 'Bajo', string> = {
+    Alto: t('ai.level.high'), Medio: t('ai.level.med'), Bajo: t('ai.level.low'),
+  }
 
   return (
     <Box sx={{ display: 'flex', gap: 2, mt: 0.5 }}>
@@ -120,7 +137,7 @@ function RecDetail({ rec }: { rec: Recommendation }) {
           fontSize: '0.6rem', color: '#94A3B8', fontWeight: 700,
           textTransform: 'uppercase', letterSpacing: '0.07em', mb: 1,
         }}>
-          Pasos de implementación
+          {t('ai.detail.steps')}
         </Typography>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.7 }}>
           {steps.map((step, i) => (
@@ -148,7 +165,7 @@ function RecDetail({ rec }: { rec: Recommendation }) {
             fontSize: '0.6rem', color: '#94A3B8', fontWeight: 700,
             textTransform: 'uppercase', letterSpacing: '0.07em', mb: 0.8,
           }}>
-            Impacto esperado
+            {t('ai.detail.impact')}
           </Typography>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
             {kpis.map(kpi => (
@@ -156,7 +173,7 @@ function RecDetail({ rec }: { rec: Recommendation }) {
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                 px: 1, py: 0.4, borderRadius: '8px', background: '#F8FAFC',
               }}>
-                <Typography sx={{ fontSize: '0.66rem', color: '#64748B' }}>{kpi.label}</Typography>
+                <Typography sx={{ fontSize: '0.66rem', color: '#64748B' }}>{KPI_LABELS[kpi.label as keyof typeof KPI_LABELS] ?? kpi.label}</Typography>
                 <Typography sx={{ fontSize: '0.72rem', fontWeight: 800, color: '#1A3C5E' }}>{kpi.value}</Typography>
               </Box>
             ))}
@@ -169,7 +186,7 @@ function RecDetail({ rec }: { rec: Recommendation }) {
             fontSize: '0.6rem', color: '#94A3B8', fontWeight: 700,
             textTransform: 'uppercase', letterSpacing: '0.07em', mb: 0.8,
           }}>
-            Entidades implicadas
+            {t('ai.detail.stakeholders')}
           </Typography>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
             {stakeholders.map(s => (
@@ -203,8 +220,36 @@ function RecDetail({ rec }: { rec: Recommendation }) {
 // ── Main view ─────────────────────────────────────────────────────────────────
 export default function AIRecsView() {
   const { destination } = useDestination()
+  const { t } = useLanguage()
   const [filterPriority, setFilterPriority] = useState<FilterPriority>('all')
   const [expandedId, setExpandedId]         = useState<number | null>(null)
+
+  const PRIORITY_LABELS_T: Record<Priority, string> = {
+    high: t('ai.priority.high'), medium: t('ai.priority.med'), low: t('ai.priority.low'),
+  }
+  const FILTER_OPTIONS_T: Array<{ key: FilterPriority; label: string }> = [
+    { key: 'all',    label: t('ai.filter.all') },
+    { key: 'high',   label: t('ai.filter.high') },
+    { key: 'medium', label: t('ai.filter.med') },
+    { key: 'low',    label: t('ai.filter.low') },
+  ]
+  const CAT_LABEL: Record<string, string> = {
+    Accesibilidad: t('ai.cat.access'), Movilidad: t('ai.cat.mobility'),
+    Señalización: t('ai.cat.signage'), Transporte: t('ai.cat.transport'),
+    Infraestructura: t('ai.cat.infra'), Digital: t('ai.cat.digital'),
+  }
+  const CAT_DESC: Record<string, string> = {
+    Accesibilidad: t('ai.desc.access'), Movilidad: t('ai.desc.mobility'),
+    Señalización: t('ai.desc.signage'), Transporte: t('ai.desc.transport'),
+    Infraestructura: t('ai.desc.infra'), Digital: t('ai.desc.digital'),
+  }
+  const LEVEL_LABEL: Record<'Alto' | 'Medio' | 'Bajo', string> = {
+    Alto: t('ai.level.high'), Medio: t('ai.level.med'), Bajo: t('ai.level.low'),
+  }
+  const TITLES_T = [
+    t('ai.title.0'), t('ai.title.1'), t('ai.title.2'), t('ai.title.3'),
+    t('ai.title.4'), t('ai.title.5'), t('ai.title.6'), t('ai.title.7'),
+  ]
 
   const recommendations = useMemo<Recommendation[]>(() => {
     const rng = mkRng(destination.id + 'ai')
@@ -213,12 +258,13 @@ export default function AIRecsView() {
       id: i + 1,
       priority,
       category:  CATEGORIES[Math.floor(rng() * CATEGORIES.length)],
-      title:     TITLES[i],
+      title:     TITLES_T[i],
       impact:    pickLevel(rng),
       cost:      pickLevel(rng),
       timeWeeks: Math.round(4 + rng() * 48),
     }))
-  }, [destination.id])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [destination.id, t])
 
   const filtered = useMemo(
     () => filterPriority === 'all' ? recommendations : recommendations.filter(r => r.priority === filterPriority),
@@ -239,7 +285,7 @@ export default function AIRecsView() {
           <Box sx={{ width: 4, height: 28, borderRadius: 2, background: '#C05928', flexShrink: 0 }} />
           <Box>
             <Typography sx={{ fontSize: '0.63rem', color: '#94A3B8', lineHeight: 1, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              Recomendaciones IA
+              {t('ai.header')}
             </Typography>
             <Typography sx={{ fontSize: '0.86rem', fontWeight: 700, color: '#1A3C5E' }}>
               {destination.name}
@@ -248,7 +294,7 @@ export default function AIRecsView() {
         </Box>
 
         <Box sx={{ display: 'flex', gap: 0.75 }}>
-          {FILTER_OPTIONS.map(({ key, label }) => {
+          {FILTER_OPTIONS_T.map(({ key, label }) => {
             const active = filterPriority === key
             return (
               <Box
@@ -298,12 +344,12 @@ export default function AIRecsView() {
               {/* Row 1: priority + category + title */}
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                 <Chip
-                  label={`● ${PRIORITY_LABELS[rec.priority]}`}
+                  label={`● ${PRIORITY_LABELS_T[rec.priority]}`}
                   bg={`${priorityColor}18`}
                   color={priorityColor}
                   border={`1px solid ${priorityColor}50`}
                 />
-                <Chip label={rec.category} bg="#F1F5F9" color="#475569" border="1px solid #E2E8F0" />
+                <Chip label={CAT_LABEL[rec.category] ?? rec.category} bg="#F1F5F9" color="#475569" border="1px solid #E2E8F0" />
                 <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#1A3C5E', flex: 1, minWidth: 0 }}>
                   {rec.title}
                 </Typography>
@@ -311,15 +357,15 @@ export default function AIRecsView() {
 
               {/* Row 2: impact + cost + time */}
               <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
-                <Chip label={`Impacto: ${rec.impact}`} bg={`${levelColor(rec.impact)}15`} color={levelColor(rec.impact)} />
-                <Chip label={`Coste: ${rec.cost}`}     bg={`${levelColor(rec.cost)}15`}   color={levelColor(rec.cost)} />
-                <Chip label={`Plazo: ${rec.timeWeeks} sem.`} bg="#EFF6FF" color="#2E7D98" border="1px solid #2E7D9830" />
+                <Chip label={`${t('ai.chip.impact')} ${LEVEL_LABEL[rec.impact as keyof typeof LEVEL_LABEL] ?? rec.impact}`} bg={`${levelColor(rec.impact)}15`} color={levelColor(rec.impact)} />
+                <Chip label={`${t('ai.chip.cost')} ${LEVEL_LABEL[rec.cost as keyof typeof LEVEL_LABEL] ?? rec.cost}`}     bg={`${levelColor(rec.cost)}15`}   color={levelColor(rec.cost)} />
+                <Chip label={`${rec.timeWeeks} ${t('ai.chip.weeks')}`} bg="#EFF6FF" color="#2E7D98" border="1px solid #2E7D9830" />
               </Box>
 
               {/* Row 3: description + toggle button */}
               <Box sx={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 1 }}>
                 <Typography sx={{ fontSize: '0.72rem', color: '#64748B', lineHeight: 1.5, flex: 1 }}>
-                  {CATEGORY_DESCRIPTIONS[rec.category]}
+                  {CAT_DESC[rec.category]}
                 </Typography>
                 <Box
                   onClick={() => setExpandedId(isExpanded ? null : rec.id)}
@@ -336,7 +382,7 @@ export default function AIRecsView() {
                     },
                   }}
                 >
-                  {isExpanded ? 'Cerrar ↑' : 'Ver detalle →'}
+                  {isExpanded ? t('ai.toggle.close') : t('ai.toggle.open')}
                 </Box>
               </Box>
 
@@ -356,7 +402,7 @@ export default function AIRecsView() {
         {filtered.length === 0 && (
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, minHeight: 200 }}>
             <Typography sx={{ fontSize: '0.8rem', color: '#94A3B8' }}>
-              No hay recomendaciones para este filtro.
+              {t('ai.empty')}
             </Typography>
           </Box>
         )}

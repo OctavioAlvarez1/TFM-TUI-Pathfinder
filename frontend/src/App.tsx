@@ -100,7 +100,7 @@ export default function App() {
                   <Box sx={{ display: 'flex', gap: 2, height: 260, alignItems: 'stretch' }}>
                     <Box sx={{ flex: '0 0 45%', height: '100%' }}><EvolutionChart /></Box>
                     <Box sx={{ flex: '0 0 200px', height: '100%' }}><ModalDonut /></Box>
-                    <Box sx={{ flex: 1, height: '100%' }}><OpportunitiesPanel /></Box>
+                    <Box sx={{ flex: 1, height: '100%' }}><OpportunitiesPanel onNavigate={setCurrentView} /></Box>
                   </Box>
                 </Box>
               </>

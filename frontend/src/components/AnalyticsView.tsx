@@ -1,6 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { Box, Typography } from '@mui/material'
 import { useDestination } from '../context/DestinationContext'
+import { fetchPernoctaciones } from '../api/ine'
+import type { INEObs } from '../api/ine'
 
 function mkRng(seed: string) {
   let s = [...seed].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) | 0, 1)
@@ -10,6 +12,7 @@ function mkRng(seed: string) {
 type TimeRange = '6 meses' | '12 meses' | '24 meses'
 
 const TIME_RANGES: TimeRange[] = ['6 meses', '12 meses', '24 meses']
+const TIME_RANGE_N: Record<TimeRange, number> = { '6 meses': 6, '12 meses': 12, '24 meses': 24 }
 
 const MONTH_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
@@ -20,6 +23,12 @@ const TREND_BULLETS = [
   'Las zonas periféricas registran mayor accesibilidad que la media nacional',
   'El transporte público representó el 34% de los desplazamientos turísticos',
 ]
+
+function fmtPernocta(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000)     return `${Math.round(n / 1_000)}K`
+  return String(n)
+}
 
 function KPICard({
   label, value, unit, color, delta,
@@ -63,26 +72,34 @@ function KPICard({
 
 export default function AnalyticsView() {
   const { destination } = useDestination()
-  const [timeRange, setTimeRange] = useState<TimeRange>('12 meses')
+  const [timeRange, setTimeRange]     = useState<TimeRange>('12 meses')
+  const [ineData,   setIneData]       = useState<INEObs[]>([])
+  const [ineLoading, setIneLoading]   = useState(false)
 
-  const data = useMemo(() => {
+  useEffect(() => {
+    setIneData([])
+    setIneLoading(true)
+    fetchPernoctaciones(destination.id)
+      .then(setIneData)
+      .finally(() => setIneLoading(false))
+  }, [destination.id])
+
+  const synth = useMemo(() => {
     const rng = mkRng(destination.id + 'analytics')
 
-    const visitors = Math.round(12000 + rng() * 73000)
-    const sustainable = Math.round(32 + rng() * 46)
+    const visitors     = Math.round(12000 + rng() * 73000)
+    const sustainable  = Math.round(32 + rng() * 46)
     const satisfaction = Math.round((6.8 + rng() * 2.6) * 10) / 10
-    const incidents = Math.round(2 + rng() * 16)
+    const incidents    = Math.round(2 + rng() * 16)
 
-    // Monthly bar values (0-100)
-    const SUMMER = [6, 7]   // Jul, Ago indices
-    const WINTER = [0, 1, 11] // Ene, Feb, Dic indices
+    const SUMMER = [6, 7]
+    const WINTER = [0, 1, 11]
     const months = MONTH_LABELS.map((_, i) => {
       if (SUMMER.includes(i)) return Math.round(85 + rng() * 15)
       if (WINTER.includes(i)) return Math.round(40 + rng() * 20)
       return Math.round(55 + rng() * 35)
     })
 
-    // Peer destinations: pick 4 that don't match current destination name
     const peers = PEER_DESTINATIONS
       .filter(p => p.toLowerCase() !== destination.name.toLowerCase())
       .slice(0, 4)
@@ -91,19 +108,48 @@ export default function AnalyticsView() {
     const currentValue = Math.round(60 + rng() * 35)
 
     return { visitors, sustainable, satisfaction, incidents, months, peers, currentValue }
-  }, [destination.id])
+  }, [destination.id, destination.name])
 
-  const maxMonthVal = Math.max(...data.months)
+  const hasRealData = ineData.length > 0
 
-  // For 6/24 months, show subset/repeat of the 12-month data
-  const visibleMonths = useMemo(() => {
-    if (timeRange === '6 meses') return MONTH_LABELS.slice(6).map((label, i) => ({ label, value: data.months[6 + i] }))
-    return MONTH_LABELS.map((label, i) => ({ label, value: data.months[i] }))
-  }, [timeRange, data.months])
+  // KPI — real when available
+  const kpiPernocta = useMemo(() => {
+    if (!hasRealData) return { value: synth.visitors.toLocaleString(), delta: '↑ 12% vs año anterior' }
+    const last = ineData[ineData.length - 1]
+    const prevYear = ineData.find(o => o.year === last.year - 1 && o.month === last.month)
+    const delta = prevYear
+      ? `${last.pernoctaciones >= prevYear.pernoctaciones ? '↑' : '↓'} ${
+          Math.abs(Math.round((last.pernoctaciones - prevYear.pernoctaciones) / prevYear.pernoctaciones * 100))
+        }% vs año anterior`
+      : undefined
+    return { value: fmtPernocta(last.pernoctaciones), delta }
+  }, [hasRealData, ineData, synth.visitors])
+
+  // Bar chart data — real months or synthetic fallback
+  interface BarObs { label: string; value: number; year?: number }
+
+  const visibleBars = useMemo((): BarObs[] => {
+    const n = TIME_RANGE_N[timeRange]
+
+    if (hasRealData) {
+      return ineData.slice(-n).map(obs => ({
+        label: MONTH_LABELS[obs.month - 1],
+        value: obs.pernoctaciones,
+        year:  obs.year,
+      }))
+    }
+
+    if (timeRange === '6 meses') {
+      return MONTH_LABELS.slice(6).map((label, i) => ({ label, value: synth.months[6 + i] }))
+    }
+    return MONTH_LABELS.map((label, i) => ({ label, value: synth.months[i] }))
+  }, [timeRange, hasRealData, ineData, synth.months])
+
+  const maxBarVal = Math.max(...visibleBars.map(b => b.value), 1)
 
   const allPeers = [
-    { name: destination.name, value: data.currentValue, isCurrent: true },
-    ...data.peers.map(p => ({ ...p, isCurrent: false })),
+    { name: destination.name, value: synth.currentValue, isCurrent: true },
+    ...synth.peers.map(p => ({ ...p, isCurrent: false })),
   ]
   const maxPeerVal = Math.max(...allPeers.map(p => p.value))
 
@@ -132,7 +178,6 @@ export default function AnalyticsView() {
           </Box>
         </Box>
 
-        {/* Time range pills */}
         <Box sx={{ display: 'flex', gap: 0.75 }}>
           {TIME_RANGES.map((range) => {
             const active = timeRange === range
@@ -163,27 +208,27 @@ export default function AnalyticsView() {
         {/* KPI row */}
         <Box sx={{ display: 'flex', gap: 1.5, flexShrink: 0 }}>
           <KPICard
-            label="Visitantes mes"
-            value={data.visitors.toLocaleString()}
+            label={hasRealData ? 'Pernoctaciones (último mes)' : 'Visitantes mes'}
+            value={kpiPernocta.value}
             color="#1A3C5E"
-            delta="↑ 12% vs año anterior"
+            delta={kpiPernocta.delta}
           />
           <KPICard
             label="Flujo sostenible"
-            value={`${data.sustainable}`}
+            value={`${synth.sustainable}`}
             unit="%"
             color="#2D6A4F"
             delta="↑ 8 pp vs año anterior"
           />
           <KPICard
             label="Índice satisfacción"
-            value={data.satisfaction.toFixed(1)}
+            value={synth.satisfaction.toFixed(1)}
             unit="/10"
             color="#2E7D98"
           />
           <KPICard
             label="Incidencias"
-            value={`${data.incidents}`}
+            value={`${synth.incidents}`}
             color="#EF4444"
             delta="↓ 3 vs periodo anterior"
           />
@@ -192,47 +237,60 @@ export default function AnalyticsView() {
         {/* Two-column charts */}
         <Box sx={{ display: 'flex', gap: 2, flex: 1, minHeight: 0 }}>
 
-          {/* LEFT — Monthly visitor bar chart */}
+          {/* LEFT — Monthly bar chart */}
           <Box sx={{
             flex: 1, background: '#fff', border: '1px solid #E0D8CF',
             borderRadius: '12px', p: 2, boxShadow: '0 2px 8px rgba(26,60,94,0.07)',
             display: 'flex', flexDirection: 'column', gap: 1.5,
           }}>
-            <Typography sx={{
-              fontSize: '0.63rem', color: '#94A3B8', textTransform: 'uppercase',
-              letterSpacing: '0.08em', fontWeight: 600,
-            }}>
-              Evolución mensual de visitantes
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Typography sx={{
+                fontSize: '0.63rem', color: '#94A3B8', textTransform: 'uppercase',
+                letterSpacing: '0.08em', fontWeight: 600,
+              }}>
+                {hasRealData ? 'Pernoctaciones hoteleras · INE · EOH' : 'Evolución mensual de visitantes'}
+              </Typography>
+              {ineLoading && (
+                <Typography sx={{ fontSize: '0.6rem', color: '#CBD5E1' }}>cargando INE…</Typography>
+              )}
+              {hasRealData && !ineLoading && (
+                <Box sx={{
+                  px: 0.9, py: 0.2, borderRadius: '10px',
+                  background: 'rgba(45,106,79,0.1)', border: '1px solid rgba(45,106,79,0.25)',
+                }}>
+                  <Typography sx={{ fontSize: '0.58rem', color: '#2D6A4F', fontWeight: 700 }}>
+                    Datos reales
+                  </Typography>
+                </Box>
+              )}
+            </Box>
 
-            {/* Bar chart container */}
-            <Box sx={{
-              height: 180, display: 'flex', alignItems: 'flex-end', gap: 0.5, px: 0.5,
-            }}>
-              {visibleMonths.map(({ label, value }) => {
-                const isMax = value === maxMonthVal
-                const barH = `${(value / maxMonthVal) * 100}%`
+            {/* Bar chart */}
+            <Box sx={{ height: 180, display: 'flex', alignItems: 'flex-end', gap: 0.5, px: 0.5 }}>
+              {visibleBars.map(({ label, value, year }, idx) => {
+                const isMax = value === maxBarVal
+                const barH  = `${(value / maxBarVal) * 100}%`
                 return (
                   <Box
-                    key={label}
+                    key={`${label}-${year ?? idx}`}
                     sx={{
                       flex: 1, display: 'flex', flexDirection: 'column',
                       alignItems: 'center', justifyContent: 'flex-end', height: '100%',
                     }}
                   >
                     {isMax && (
-                      <Box sx={{
-                        width: 6, height: 6, borderRadius: '50%',
-                        background: '#C05928', mb: 0.4, flexShrink: 0,
-                      }} />
+                      <Box sx={{ width: 6, height: 6, borderRadius: '50%', background: '#C05928', mb: 0.4, flexShrink: 0 }} />
+                    )}
+                    {hasRealData && (
+                      <Typography sx={{ fontSize: '0.46rem', color: '#94A3B8', mb: 0.25, lineHeight: 1 }}>
+                        {fmtPernocta(value)}
+                      </Typography>
                     )}
                     <Box
                       sx={{
                         width: '100%', maxWidth: 26,
                         height: barH,
-                        background: isMax
-                          ? 'linear-gradient(to top, #1A3C5E, #2E7D98)'
-                          : 'linear-gradient(to top, #1A3C5E, #2E7D98)',
+                        background: 'linear-gradient(to top, #1A3C5E, #2E7D98)',
                         opacity: isMax ? 1 : 0.72,
                         borderRadius: '4px 4px 0 0',
                         transition: 'height 0.4s ease',
@@ -242,6 +300,11 @@ export default function AnalyticsView() {
                     <Typography sx={{ fontSize: '0.56rem', color: '#94A3B8', mt: 0.5, lineHeight: 1 }}>
                       {label}
                     </Typography>
+                    {hasRealData && visibleBars.length > 12 && (
+                      <Typography sx={{ fontSize: '0.44rem', color: '#CBD5E1', lineHeight: 1 }}>
+                        {String(year).slice(2)}
+                      </Typography>
+                    )}
                   </Box>
                 )
               })}
@@ -263,7 +326,7 @@ export default function AnalyticsView() {
 
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.1 }}>
               {allPeers.map((peer) => {
-                const fillPct = (peer.value / maxPeerVal) * 100
+                const fillPct  = (peer.value / maxPeerVal) * 100
                 const barColor = peer.isCurrent ? '#1A3C5E' : '#2E7D98'
                 return (
                   <Box key={peer.name}>
@@ -275,21 +338,14 @@ export default function AnalyticsView() {
                       }}>
                         {peer.name}
                       </Typography>
-                      <Typography sx={{
-                        fontSize: '0.72rem', fontWeight: 700, color: barColor,
-                      }}>
+                      <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: barColor }}>
                         {peer.value}
                       </Typography>
                     </Box>
-                    <Box sx={{
-                      height: 9, borderRadius: 5,
-                      background: `${barColor}20`,
-                      overflow: 'hidden',
-                    }}>
+                    <Box sx={{ height: 9, borderRadius: 5, background: `${barColor}20`, overflow: 'hidden' }}>
                       <Box sx={{
                         height: '100%', width: `${fillPct}%`,
-                        background: barColor,
-                        borderRadius: 5,
+                        background: barColor, borderRadius: 5,
                         transition: 'width 0.4s ease',
                       }} />
                     </Box>

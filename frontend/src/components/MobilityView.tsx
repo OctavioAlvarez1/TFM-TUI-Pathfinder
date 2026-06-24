@@ -1,5 +1,5 @@
-import { useMemo } from 'react'
-import { Box, Typography, LinearProgress } from '@mui/material'
+import { useMemo, useState } from 'react'
+import { Box, Typography, LinearProgress, Slider } from '@mui/material'
 import { useDestination } from '../context/DestinationContext'
 
 function mkRng(seed: string) {
@@ -60,6 +60,14 @@ function KPICard({
   )
 }
 
+const CO2_PER_KM: Record<string, number> = { car: 170, bus: 68, bike: 0, walk: 0 }
+const CALC_MODES = [
+  { id: 'car',   emoji: '🚗', label: 'Coche',   color: '#EF4444' },
+  { id: 'bus',   emoji: '🚌', label: 'Bus',     color: '#F59E0B' },
+  { id: 'bike',  emoji: '🚲', label: 'Bici',    color: '#2E7D98' },
+  { id: 'walk',  emoji: '🚶', label: 'A pie',   color: '#2D6A4F' },
+]
+
 export default function MobilityView() {
   const { destination } = useDestination()
 
@@ -117,6 +125,15 @@ export default function MobilityView() {
   }, [data.modal])
 
   const maxEmission = data.carEmissions
+
+  const [calcMode, setCalcMode] = useState<'car' | 'bus' | 'bike' | 'walk'>('car')
+  const [calcDist, setCalcDist] = useState(50)
+
+  const calcCO2  = CO2_PER_KM[calcMode] * calcDist
+  const carCO2   = CO2_PER_KM.car * calcDist
+  const savingG  = carCO2 - calcCO2
+  const savingPct = calcMode !== 'car' ? Math.round((savingG / carCO2) * 100) : 0
+  const fmtG = (g: number) => g >= 1000 ? `${(g / 1000).toFixed(1)} kg` : `${g} g`
 
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#FAFAF8' }}>
@@ -352,6 +369,99 @@ export default function MobilityView() {
             </Box>
           </Box>
         </Box>
+
+        {/* Carbon footprint personal calculator */}
+        <Box sx={{
+          background: '#fff', border: '1px solid #E0D8CF',
+          borderTop: '3px solid #2D6A4F',
+          borderRadius: '12px', p: 2, boxShadow: '0 2px 8px rgba(26,60,94,0.07)',
+          flexShrink: 0,
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+            <Typography sx={{
+              fontSize: '0.63rem', color: '#94A3B8', textTransform: 'uppercase',
+              letterSpacing: '0.08em', fontWeight: 600,
+            }}>
+              Calcula tu huella de carbono
+            </Typography>
+            <Typography sx={{ fontSize: '0.68rem', color: '#475569' }}>
+              Distancia: <strong>{calcDist} km</strong>
+            </Typography>
+          </Box>
+
+          {/* Mode buttons + slider row */}
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+            {/* Mode selector */}
+            <Box sx={{ display: 'flex', gap: 0.75, flexShrink: 0 }}>
+              {CALC_MODES.map((m) => {
+                const active = calcMode === m.id
+                return (
+                  <Box
+                    key={m.id}
+                    onClick={() => setCalcMode(m.id as typeof calcMode)}
+                    sx={{
+                      px: 1.2, py: 0.6, borderRadius: '20px', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: 0.5,
+                      background: active ? m.color : 'transparent',
+                      border: `1px solid ${active ? m.color : '#CBD5E1'}`,
+                      transition: 'all 0.15s',
+                      '&:hover': { borderColor: m.color },
+                    }}
+                  >
+                    <Typography sx={{ fontSize: '0.85rem', lineHeight: 1 }}>{m.emoji}</Typography>
+                    <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: active ? '#fff' : '#64748B' }}>
+                      {m.label}
+                    </Typography>
+                  </Box>
+                )
+              })}
+            </Box>
+
+            {/* Distance slider */}
+            <Box sx={{ flex: 1, px: 1 }}>
+              <Slider
+                min={1} max={500} value={calcDist}
+                onChange={(_e, v) => setCalcDist(v as number)}
+                sx={{
+                  color: '#1A3C5E',
+                  '& .MuiSlider-thumb': { width: 16, height: 16 },
+                  '& .MuiSlider-rail': { opacity: 0.25 },
+                }}
+              />
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: -0.5 }}>
+                <Typography sx={{ fontSize: '0.58rem', color: '#CBD5E1' }}>1 km</Typography>
+                <Typography sx={{ fontSize: '0.58rem', color: '#CBD5E1' }}>500 km</Typography>
+              </Box>
+            </Box>
+
+            {/* Result */}
+            <Box sx={{
+              flexShrink: 0, minWidth: 140, px: 1.5, py: 1,
+              borderRadius: '10px', textAlign: 'right',
+              background: calcMode === 'car' ? 'rgba(239,68,68,0.07)' : 'rgba(45,106,79,0.07)',
+              border: `1px solid ${calcMode === 'car' ? 'rgba(239,68,68,0.2)' : 'rgba(45,106,79,0.2)'}`,
+            }}>
+              <Typography sx={{
+                fontSize: '1.4rem', fontWeight: 800, lineHeight: 1,
+                color: CALC_MODES.find(m => m.id === calcMode)?.color,
+              }}>
+                {fmtG(calcCO2)}
+              </Typography>
+              <Typography sx={{ fontSize: '0.6rem', color: '#94A3B8', mb: 0.25 }}>CO₂ por viaje</Typography>
+              {calcMode !== 'car' && (
+                <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, color: '#2D6A4F' }}>
+                  ↓ {savingPct}% vs coche ({fmtG(savingG)} ahorrado)
+                </Typography>
+              )}
+              {calcMode === 'car' && (
+                <Typography sx={{ fontSize: '0.62rem', color: '#EF4444' }}>
+                  Cambia de modo para ver el ahorro
+                </Typography>
+              )}
+            </Box>
+          </Box>
+        </Box>
+
       </Box>
     </Box>
   )

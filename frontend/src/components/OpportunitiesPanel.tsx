@@ -17,7 +17,7 @@ const BORDER_COLOR: Record<string, string> = {
   Alta: '#EF4444', Media: '#F59E0B', Baja: '#10B981',
 }
 
-export default function OpportunitiesPanel() {
+export default function OpportunitiesPanel({ onNavigate }: { onNavigate?: (view: string) => void }) {
   const { destination } = useDestination()
   const opportunities = getDestinationOpportunities(destination.id)
 
@@ -85,15 +85,18 @@ export default function OpportunitiesPanel() {
       ))}
 
       {/* Ver todas */}
-      <Box sx={{
-        px: 2, py: 0.7, mt: 'auto',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5,
-        cursor: 'pointer', borderTop: '1px solid #FEF3C7',
-        '&:hover': { background: '#F8FAFC' },
-        transition: 'background 0.15s',
-      }}>
-        <Typography sx={{ fontSize: '0.71rem', color: '#475569', fontWeight: 600 }}>Ver todas las zonas</Typography>
-        <ArrowForwardIcon sx={{ fontSize: 13, color: '#475569' }} />
+      <Box
+        onClick={() => onNavigate?.('accessibility')}
+        sx={{
+          px: 2, py: 0.7, mt: 'auto',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5,
+          cursor: 'pointer', borderTop: '1px solid #FEF3C7',
+          '&:hover': { background: '#EFF6FF' },
+          transition: 'background 0.15s',
+        }}
+      >
+        <Typography sx={{ fontSize: '0.71rem', color: '#1A3C5E', fontWeight: 600 }}>Ver todas las zonas</Typography>
+        <ArrowForwardIcon sx={{ fontSize: 13, color: '#1A3C5E' }} />
       </Box>
 
       {/* City photo */}

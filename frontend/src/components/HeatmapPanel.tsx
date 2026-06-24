@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react'
-import { Box, Typography, Checkbox, IconButton, Button, Divider, CircularProgress } from '@mui/material'
+import { Box, Typography, Checkbox, IconButton, CircularProgress } from '@mui/material'
 import CloseIcon from '@mui/icons-material/Close'
 import LayersIcon from '@mui/icons-material/Layers'
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import { useDestination } from '../context/DestinationContext'
-import { fetchPOIs, fetchCyclePaths } from '../api/overpass'
-import type { OverpassPOI, CyclePath } from '../api/overpass'
+import { fetchPOIs, fetchCyclePaths, fetchTransitRoutes } from '../api/overpass'
+import type { OverpassPOI, CyclePath, TransitRoute } from '../api/overpass'
 import 'leaflet/dist/leaflet.css'
 
 // ── Layer config ──────────────────────────────────────────────────────────────
@@ -108,9 +108,20 @@ function poiInfoRows(poi: OverpassPOI): { label: string; val: string; highlight?
 // ── Map re-center controller ──────────────────────────────────────────────────
 function MapController({ center, zoom }: { center: [number, number]; zoom: number }) {
   const map = useMap()
+
+  // Observe container size changes so tiles fill the panel on every layout pass
   useEffect(() => {
+    const container = map.getContainer()
+    const ro = new ResizeObserver(() => { map.invalidateSize() })
+    ro.observe(container)
+    return () => ro.disconnect()
+  }, [map])
+
+  useEffect(() => {
+    map.invalidateSize()
     map.setView(center, zoom)
   }, [center, zoom, map])
+
   return null
 }
 
@@ -126,10 +137,11 @@ export default function HeatmapPanel() {
   const [resolvedPhoto, setResolvedPhoto] = useState<string | null>(null)
   const [photoLoading, setPhotoLoading]   = useState(false)
 
-  const [livePOIs,  setLivePOIs]  = useState<OverpassPOI[]>([])
-  const [livePaths, setLivePaths] = useState<CyclePath[]>([])
-  const [loading,   setLoading]   = useState(false)
-  const [fetchError, setFetchError] = useState<string | null>(null)
+  const [livePOIs,    setLivePOIs]    = useState<OverpassPOI[]>([])
+  const [livePaths,   setLivePaths]   = useState<CyclePath[]>([])
+  const [liveRoutes,  setLiveRoutes]  = useState<TransitRoute[]>([])
+  const [loading,     setLoading]     = useState(false)
+  const [fetchError,  setFetchError]  = useState<string | null>(null)
 
   // Fetch POIs + cycle paths whenever destination changes
   useEffect(() => {
@@ -137,18 +149,23 @@ export default function HeatmapPanel() {
     setFetchError(null)
     setLivePOIs([])
     setLivePaths([])
+    setLiveRoutes([])
     setSelected(null)
 
-    Promise.all([
+    Promise.allSettled([
       fetchPOIs(destination.lat, destination.lon, destination.id, destination.bboxDelta),
       fetchCyclePaths(destination.lat, destination.lon, destination.id, destination.bboxDelta),
+      fetchTransitRoutes(destination.lat, destination.lon, destination.id, destination.bboxDelta),
     ])
-      .then(([pois, paths]) => {
+      .then(([poisRes, pathsRes, routesRes]) => {
+        const pois   = poisRes.status   === 'fulfilled' ? poisRes.value   : []
+        const paths  = pathsRes.status  === 'fulfilled' ? pathsRes.value  : []
+        const routes = routesRes.status === 'fulfilled' ? routesRes.value : []
         setLivePOIs(pois)
         setLivePaths(paths)
+        setLiveRoutes(routes)
         if (pois.length === 0) setFetchError('Sin datos OSM para esta zona')
       })
-      .catch((err: Error) => setFetchError(err.message ?? 'Error al cargar datos'))
       .finally(() => setLoading(false))
   }, [destination])
 
@@ -203,13 +220,12 @@ export default function HeatmapPanel() {
       borderRadius: '16px',
       border: '1.5px solid rgba(26,60,94,0.18)',
       overflow: 'hidden', width: '100%', height: '100%', position: 'relative',
-      display: 'block',
       boxShadow: '0 8px 32px rgba(26,60,94,0.16), 0 2px 8px rgba(0,0,0,0.08)',
     }}>
       {/* ── Leaflet map ── */}
       <MapContainer
         center={mapCenter} zoom={destination.zoom}
-        style={{ width: '100%', height: '100%', minHeight: 400 }}
+        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
         zoomControl={false} attributionControl={false}
       >
         <MapController center={mapCenter} zoom={destination.zoom} />
@@ -225,11 +241,23 @@ export default function HeatmapPanel() {
             pathOptions={{ color: path.color, weight: 3, opacity: 0.8 }} />
         ))}
 
-        {/* Static representative metro/bus routes (Valencia only) */}
-        {destination.id === 'valencia' && STATIC_ROUTES.map(r => (
-          <Polyline key={r.id} positions={r.coords}
-            pathOptions={{ color: r.color, weight: r.weight, opacity: 0.75 }} />
-        ))}
+        {/* Transit routes: real Overpass data, fallback to static for Valencia */}
+        {layerOn['transporte'] && (
+          liveRoutes.length > 0
+            ? liveRoutes.flatMap(route =>
+                route.segments.map((seg, si) => (
+                  <Polyline
+                    key={`route-${route.id}-${si}`}
+                    positions={seg}
+                    pathOptions={{ color: route.color, weight: 4, opacity: 0.82 }}
+                  />
+                ))
+              )
+            : STATIC_ROUTES.map(r => (
+                <Polyline key={r.id} positions={r.coords}
+                  pathOptions={{ color: r.color, weight: r.weight, opacity: 0.75 }} />
+              ))
+        )}
 
         {visiblePOIs.map(poi => (
           <Marker
@@ -269,7 +297,9 @@ export default function HeatmapPanel() {
             boxShadow: fetchError ? '0 0 4px #FCA5A5' : '0 0 6px #10B981',
           }} />
           <Typography style={{ fontSize: '0.64rem', color: '#fff', fontWeight: 500 }}>
-            {fetchError ? fetchError : `${livePOIs.length} POIs · OpenStreetMap`}
+            {fetchError
+              ? fetchError
+              : `${livePOIs.length} POIs · ${liveRoutes.length > 0 ? `${liveRoutes.length} líneas · ` : ''}OpenStreetMap`}
           </Typography>
         </Box>
       )}
@@ -385,14 +415,18 @@ export default function HeatmapPanel() {
       {/* ── POI popup (top-right, left of zoom controls) ── */}
       {selected && (
         <Box sx={{
-          position: 'absolute', top: 12, right: 52, zIndex: 1000,
-          background: '#fff', borderRadius: '12px', border: '1px solid #E2E8F0',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.14)', width: 222, overflow: 'hidden',
+          position: 'absolute', top: 12, right: 54, zIndex: 1000,
+          background: '#fff', borderRadius: '14px',
+          border: '1px solid rgba(26,60,94,0.12)',
+          boxShadow: '0 8px 32px rgba(26,60,94,0.18), 0 2px 8px rgba(0,0,0,0.08)',
+          width: 232, overflow: 'hidden',
         }}>
-          {/* Photo — real Wikipedia image or gradient fallback */}
-          <Box sx={{ height: 110, position: 'relative', overflow: 'hidden',
-                     background: TYPE_PHOTO[selected.type],
-                     display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {/* Photo / gradient header */}
+          <Box sx={{
+            height: 100, position: 'relative', overflow: 'hidden',
+            background: TYPE_PHOTO[selected.type],
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
             {resolvedPhoto ? (
               <img src={resolvedPhoto} alt={selected.name}
                 style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
@@ -400,45 +434,84 @@ export default function HeatmapPanel() {
             ) : photoLoading ? (
               <Typography style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.7)' }}>Cargando…</Typography>
             ) : (
-              <Typography style={{ fontSize: '2.6rem', opacity: 0.35 }}>{TYPE_ICON[selected.type]}</Typography>
+              <Typography style={{ fontSize: '2.4rem', opacity: 0.30 }}>{TYPE_ICON[selected.type]}</Typography>
             )}
-            <IconButton size="small" onClick={() => setSelected(null)}
-              style={{ position: 'absolute', top: 6, right: 6,
-                       background: 'rgba(255,255,255,0.88)', padding: 3 }}>
-              <CloseIcon style={{ fontSize: 13, color: '#475569' }} />
-            </IconButton>
+
+            {/* Type badge */}
+            <Box sx={{
+              position: 'absolute', bottom: 8, left: 10,
+              background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(6px)',
+              borderRadius: '20px', px: 1, py: 0.25,
+            }}>
+              <Typography style={{ fontSize: '0.6rem', color: '#fff', fontWeight: 600, letterSpacing: '0.04em' }}>
+                {TYPE_ICON[selected.type]} {selected.type.charAt(0).toUpperCase() + selected.type.slice(1)}
+              </Typography>
+            </Box>
+
+            {/* Close button */}
+            <Box
+              onClick={() => setSelected(null)}
+              sx={{
+                position: 'absolute', top: 7, right: 7,
+                width: 24, height: 24, borderRadius: '50%',
+                background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(4px)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', transition: 'background 0.15s',
+                '&:hover': { background: '#fff' },
+              }}
+            >
+              <CloseIcon style={{ fontSize: 13, color: '#475569', display: 'block' }} />
+            </Box>
           </Box>
 
-          {/* Info */}
-          <Box sx={{ px: 1.5, pt: 1.2, pb: 1.5 }}>
-            <Typography style={{ fontSize: '0.83rem', fontWeight: 700, color: '#1E293B', marginBottom: 10 }}>
+          {/* Info body */}
+          <Box sx={{ px: 1.6, pt: 1.3, pb: 1.6 }}>
+            <Typography style={{ fontSize: '0.84rem', fontWeight: 700, color: '#1A3C5E', lineHeight: 1.3, marginBottom: 10 }}>
               {selected.name}
             </Typography>
 
-            {poiInfoRows(selected).map(r => (
-              <Box key={r.label} sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                <Typography style={{ fontSize: '0.7rem', color: '#64748B' }}>{r.label}</Typography>
-                <Typography style={{ fontSize: '0.7rem', color: r.highlight ? '#10B981' : '#94A3B8', fontWeight: 600 }}>
-                  {r.val}
-                </Typography>
-              </Box>
-            ))}
-
-            <Divider sx={{ my: 1, borderColor: '#F1F5F9' }} />
-
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-              <Typography style={{ fontSize: '0.7rem', color: '#64748B' }}>Fuente</Typography>
-              <Typography style={{ fontSize: '0.7rem', color: '#1E293B', fontWeight: 600 }}>OpenStreetMap</Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.55 }}>
+              {poiInfoRows(selected).map(r => (
+                <Box key={r.label} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography style={{ fontSize: '0.68rem', color: '#94A3B8' }}>{r.label}</Typography>
+                  <Typography style={{ fontSize: '0.68rem', color: r.highlight ? '#10B981' : '#64748B', fontWeight: 600 }}>
+                    {r.val}
+                  </Typography>
+                </Box>
+              ))}
             </Box>
 
-            <Button fullWidth variant="contained" sx={{
-              mt: 1.2, py: 0.7, borderRadius: '8px', textTransform: 'none',
-              fontSize: '0.75rem', fontWeight: 600, boxShadow: 'none',
-              background: '#1C2B3A',
-              '&:hover': { background: '#1E3A5F', boxShadow: 'none' },
-            }}>
+            <Box sx={{ my: 1.1, height: '1px', background: 'linear-gradient(90deg, #E2E8F0 0%, transparent 100%)' }} />
+
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1.3 }}>
+              <Typography style={{ fontSize: '0.62rem', color: '#CBD5E1', fontWeight: 500 }}>Fuente:</Typography>
+              <Typography style={{ fontSize: '0.62rem', color: '#94A3B8', fontWeight: 600 }}>OpenStreetMap</Typography>
+            </Box>
+
+            {/* CTA button */}
+            <Box
+              component="button"
+              onClick={() => console.log('details', selected.name)}
+              sx={{
+                display: 'block', width: '100%',
+                py: 0.85, borderRadius: '9px', cursor: 'pointer',
+                border: 'none', outline: 'none',
+                background: 'linear-gradient(135deg, #C05928 0%, #A04820 100%)',
+                color: '#fff',
+                fontSize: '0.74rem', fontWeight: 700,
+                letterSpacing: '0.01em',
+                boxShadow: '0 2px 8px rgba(192,89,40,0.35)',
+                transition: 'all 0.15s',
+                '&:hover': {
+                  background: 'linear-gradient(135deg, #D06030 0%, #B05828 100%)',
+                  boxShadow: '0 4px 14px rgba(192,89,40,0.45)',
+                  transform: 'translateY(-1px)',
+                },
+                '&:active': { transform: 'translateY(0)', boxShadow: '0 1px 4px rgba(192,89,40,0.3)' },
+              }}
+            >
               Ver detalles
-            </Button>
+            </Box>
           </Box>
         </Box>
       )}

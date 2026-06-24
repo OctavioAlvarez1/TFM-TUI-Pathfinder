@@ -175,6 +175,85 @@ out center 200;
   return pois
 }
 
+// ── Transit route fetcher (metro / tram / light_rail) ────────────────────────
+export interface TransitRoute {
+  id: number
+  name: string
+  ref: string
+  routeType: string
+  color: string
+  segments: [number, number][][]  // one polyline per way member
+}
+
+const _transitCache = new Map<string, TransitRoute[]>()
+
+function transitDefaultColor(routeType: string): string {
+  if (routeType === 'subway' || routeType === 'metro') return '#1A3C5E'
+  if (routeType === 'tram' || routeType === 'light_rail') return '#2E7D98'
+  return '#F97316'
+}
+
+export async function fetchTransitRoutes(
+  lat: number,
+  lon: number,
+  destinationId: string,
+  bboxDelta = 0.05,
+): Promise<TransitRoute[]> {
+  if (_transitCache.has(destinationId)) return _transitCache.get(destinationId)!
+
+  const latD = bboxDelta
+  const lonD = bboxDelta * 1.3
+  const bbox = `${lat - latD},${lon - lonD},${lat + latD},${lon + lonD}`
+
+  const query = `
+[out:json][timeout:30];
+(
+  relation["type"="route"]["route"~"^(subway|metro|tram|light_rail)$"](${bbox});
+);
+out geom;
+`.trim()
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const json = await overpassPost(query) as any
+    const routes: TransitRoute[] = []
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const el of (json.elements ?? []) as any[]) {
+      if (el.type !== 'relation') continue
+      const tags: Record<string, string> = el.tags ?? {}
+
+      const segments: [number, number][][] = []
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for (const member of (el.members ?? []) as any[]) {
+        if (member.type !== 'way' || !member.geometry?.length) continue
+        segments.push(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (member.geometry as any[]).map((g: { lat: number; lon: number }) => [g.lat, g.lon] as [number, number])
+        )
+      }
+      if (segments.length === 0) continue
+
+      const rawColor = tags['colour'] ?? tags['color'] ?? ''
+      const color = /^#[0-9A-Fa-f]{3,6}$/.test(rawColor) ? rawColor : transitDefaultColor(tags['route'] ?? '')
+
+      routes.push({
+        id:        el.id,
+        name:      tags['name'] ?? tags['ref'] ?? `Línea ${el.id}`,
+        ref:       tags['ref'] ?? '',
+        routeType: tags['route'] ?? 'transit',
+        color,
+        segments,
+      })
+    }
+
+    if (routes.length > 0) _transitCache.set(destinationId, routes)
+    return routes
+  } catch {
+    return []
+  }
+}
+
 // ── Cycle path fetcher ────────────────────────────────────────────────────────
 export async function fetchCyclePaths(
   lat: number,

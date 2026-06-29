@@ -1,0 +1,10 @@
+services:
+  pathfinder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: tui-pathfinder:latest
+    container_name: pathfinder
+    ports:
+      - "5174:80"
+    restart: unless-stopped

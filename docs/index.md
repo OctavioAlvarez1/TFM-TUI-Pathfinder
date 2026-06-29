@@ -6,6 +6,7 @@
 
 | Documento | Descripcion |
 |---|---|
+| [memoria.md](memoria.md) | Documento academico TFM — introduccion, marco conceptual, datos, arquitectura, despliegue, conclusiones |
 | [architecture.md](architecture.md) | Arquitectura tecnica, estructura de componentes y flujo de datos |
 | [setup.md](setup.md) | Instalacion, requisitos y comandos de desarrollo |
 | [data-sources.md](data-sources.md) | Fuentes de datos — sinteticos, INE EOH y Overpass API |
